@@ -270,3 +270,58 @@ field as lines wrapped.
 Four QA checks cover it: no outline on the field, a visible focus state on the
 container, no scrolling on ordinary text, and capped height with scrolling
 beyond it.
+
+---
+
+## BUG-010 — Every nested API route 404'd in production
+
+**Severity:** Critical — sign-in, generation and everything else was dead on
+the deployed site. Only the shallow routes worked, which made it look healthy.
+
+**Steps to reproduce:** deploy, then `POST /api/auth/login`.
+
+**Expected:** the API answers.
+
+**Actual:** Vercel's own HTML 404 page. `GET /api/health` and
+`GET /api/community` returned 200 the whole time, so `/api/health` being green
+meant nothing.
+
+**Cause:** the function is `api/[...slug].js`, which is Vercel's catch-all
+syntax, but the build emitted
+
+```
+"src": "^/api/([^/]+)$"  ->  /api/[...slug]
+```
+
+`[^/]+` matches a single segment. One-segment paths routed; anything deeper
+fell through to a blanket `^/api(/.*)?$ -> status 404`. So the split was by
+path depth, not by method — `/api/health` worked and `/api/auth/login` did not.
+
+**Fix:** an explicit `"/api/:path*" -> "/api/[...slug]"` rewrite in
+`vercel.json`, which emits a pattern that matches any depth. Verified on a
+preview before promoting: a nested POST now returns the app's own
+`INVALID_CREDENTIALS` rather than Vercel's 404 page.
+
+**Lesson:** the health check was the trap. It is one segment deep, so it kept
+passing while the rest of the API was unreachable. `qa/production.mjs` now
+drives a real signup and generation against the deployment instead.
+
+---
+
+## Open — "Like persists across a reload" is intermittently red
+
+**Severity:** Low, and it is the test rather than the product.
+
+The browser suite fails this roughly one run in six, only against the remote
+database. The behaviour underneath was checked three ways and is correct:
+
+- a browser click sends exactly one `POST /like`, confirmed 3/3
+- the server reports `likedByMe: true` afterwards, 3/3
+- 20 rapid reads straight after a write all returned the like — so it is not
+  read-after-write lag on Turso
+
+Waiting for the element rather than sampling once did not fix it, so the
+assertion timing is not the whole story either. **Not root-caused.** The check
+now dumps the server's view of the feed when it fails — token present, HTTP
+status, post count, likes — so the next occurrence should say which half is
+wrong instead of needing this investigation repeated.

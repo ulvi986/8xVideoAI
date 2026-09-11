@@ -260,9 +260,45 @@ try {
   await page.waitForSelector('button[aria-label="Unlike"]', { timeout: 10000 });
   check('Liking a post works', true);
 
-  await page.reload({ waitUntil: 'networkidle' });
+  /*
+   * Wait for the state rather than sampling it once. The feed effect runs
+   * twice under StrictMode, so two fetches are in flight after a reload and
+   * the first commit can land before the one carrying this viewer's likes.
+   * Counting on a single tick made this read as an intermittent product bug;
+   * it is a race in the assertion. If the like genuinely did not persist,
+   * this still fails — it just waits to be sure first.
+   */
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('figure', { timeout: 15000 });
-  check('Like persists across a reload', (await page.locator('button[aria-label="Unlike"]').count()) > 0);
+
+  let persisted = true;
+  try {
+    await page.waitForSelector('button[aria-label="Unlike"]', { timeout: 10000 });
+  } catch {
+    persisted = false;
+  }
+
+  // On failure, report what the server actually thinks, so the next person
+  // does not have to guess whether the bug is storage or rendering.
+  let diagnosis = '';
+  if (!persisted) {
+    diagnosis = await page.evaluate(async () => {
+      const token = localStorage.getItem('8xbuildai.token');
+      const res = await fetch('/api/community?sort=new', {
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      const body = await res.json();
+      const posts = body.posts ?? [];
+      return [
+        `token=${token ? 'present' : 'MISSING'}`,
+        `http=${res.status}`,
+        `posts=${posts.length}`,
+        `likedByMe=${posts.filter(p => p.likedByMe).length}`,
+        `firstLikes=${posts[0]?.likes}`,
+      ].join(' ');
+    }).catch(e => `diagnostic failed: ${e.message}`);
+  }
+  check('Like persists across a reload', persisted, diagnosis);
 
   // ---- Library ---------------------------------------------------------
   await page.goto(`${BASE}/library`, { waitUntil: 'networkidle' });

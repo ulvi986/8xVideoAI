@@ -116,7 +116,10 @@ for (const [label, g, minBytes] of [
   ['video', video, 500_000],
 ]) {
   if (!g) continue;
-  const response = await fetch(API + g.outputUrl);
+  // In production, media lives in Blob and outputUrl is already absolute;
+  // locally it is a rooted path served by the API.
+  const mediaUrl = /^https?:\/\//.test(g.outputUrl) ? g.outputUrl : API + g.outputUrl;
+  const response = await fetch(mediaUrl);
   const bytes = (await response.arrayBuffer()).byteLength;
   check(`${label} file downloads and is substantial`, response.ok && bytes > minBytes, `${bytes} bytes`);
 }
