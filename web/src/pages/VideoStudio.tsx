@@ -4,6 +4,7 @@ import { useStudio } from '../useStudio';
 import { useAuth } from '../auth';
 import { Field, GenerateButton, HistoryStrip, ModelPicker, ResultView } from '../components/Studio';
 import { fileToBase64, MAX_UPLOAD_BYTES } from '../fileToBase64';
+import EnhanceButton from '../components/EnhanceButton';
 
 const MODES = ['Text to Video', 'Image to Video'] as const;
 
@@ -13,6 +14,7 @@ export default function VideoStudio() {
 
   const [mode, setMode] = useState<(typeof MODES)[number]>('Text to Video');
   const [prompt, setPrompt] = useState('');
+  const [originalPrompt, setOriginalPrompt] = useState<string | null>(null);
   const [model, setModel] = useState('');
   const [aspect, setAspect] = useState('16:9');
   const [duration, setDuration] = useState(6);
@@ -54,6 +56,7 @@ export default function VideoStudio() {
     e.preventDefault();
     await studio.generate({
       prompt,
+      originalPrompt,
       model,
       aspectRatio: aspect,
       duration,
@@ -106,6 +109,16 @@ export default function VideoStudio() {
               className="w-full resize-none rounded-lg border border-line bg-panel2 p-3 text-sm outline-none placeholder:text-muted/60 focus:border-accent"
             />
           </Field>
+
+          <EnhanceButton
+            kind="video"
+            prompt={prompt}
+            available={Boolean(studio.catalog?.providerStatus.enhancer)}
+            onChange={(next, original) => {
+              setPrompt(next);
+              setOriginalPrompt(original);
+            }}
+          />
 
           <ModelPicker models={models} value={model} onChange={setModel} />
 

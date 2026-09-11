@@ -51,6 +51,141 @@ body {
   border-radius: 999px;
 }
 
+/* ---------------------------------------------------------- motion system */
+
+/*
+ * Two slow-drifting radial blooms behind the hero. Animating `transform` and
+ * `opacity` only, so this stays on the compositor and never triggers layout.
+ */
+@keyframes aurora-a {
+  0%,
+  100% {
+    transform: translate3d(-12%, -8%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(10%, 6%, 0) scale(1.25);
+  }
+}
+@keyframes aurora-b {
+  0%,
+  100% {
+    transform: translate3d(12%, 10%, 0) scale(1.15);
+  }
+  50% {
+    transform: translate3d(-8%, -6%, 0) scale(0.95);
+  }
+}
+
+.aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  will-change: transform;
+  pointer-events: none;
+}
+.aurora-a {
+  animation: aurora-a 18s ease-in-out infinite;
+}
+.aurora-b {
+  animation: aurora-b 22s ease-in-out infinite;
+}
+
+/* Hero headline: words rise in, staggered by an inline --i custom property. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em) rotate(1.5deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(0);
+  }
+}
+/*
+ * `.rise` must not touch `display`. It is applied to paragraphs, grids and
+ * flex rows as well as headline words, and forcing inline-block on those
+ * collapsed them onto one line and broke the stats grid.
+ */
+.rise {
+  opacity: 0;
+  animation: rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* Only the per-word headline spans need to sit inline. */
+.rise-word {
+  display: inline-block;
+}
+
+/* Scroll reveal, toggled by IntersectionObserver adding .is-visible. */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Edge-to-edge marquee of real community work. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee var(--duration, 60s) linear infinite;
+  will-change: transform;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.floaty {
+  animation: float 6s ease-in-out infinite;
+}
+
+/*
+ * Anyone who has asked their OS for less motion gets none of it. The content
+ * must still be visible, so the reveal/rise end states are forced on rather
+ * than left at opacity 0.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-a,
+  .aurora-b,
+  .marquee-track,
+  .floaty,
+  .shimmer::after {
+    animation: none !important;
+  }
+  .rise {
+    animation: none !important;
+    opacity: 1;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Generation, Model } from '../api';
+import { api, ApiError, type Generation, type Model } from '../api';
 
 /* ---------------------------------------------------------------- pieces */
 
@@ -113,6 +113,55 @@ function Progress({ generation }: { generation: Generation }) {
   );
 }
 
+/*
+ * Share to the community feed. Audio is excluded deliberately — the feed is a
+ * visual grid, and the server rejects it too, so the control is not offered.
+ */
+function ShareControl({ generation }: { generation: Generation }) {
+  const [published, setPublished] = useState(generation.published);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // A different generation selected in History must reset the toggle.
+  useEffect(() => {
+    setPublished(generation.published);
+    setError(null);
+  }, [generation.id, generation.published]);
+
+  if (generation.kind === 'audio') return null;
+
+  async function toggle() {
+    setBusy(true);
+    setError(null);
+    const next = !published;
+    try {
+      const { generation: updated } = await api.publish(generation.id, next);
+      setPublished(updated.published);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not update sharing.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={toggle}
+        disabled={busy}
+        className={`rounded-lg px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${
+          published
+            ? 'border border-accent/50 bg-accent/10 text-accent'
+            : 'border border-line hover:bg-panel2'
+        }`}
+      >
+        {busy ? '…' : published ? '✓ In community' : 'Share to community'}
+      </button>
+      {error && <span className="text-[11px] text-hot">{error}</span>}
+    </div>
+  );
+}
+
 export function ResultView({ generation, onDelete }: { generation: Generation | null; onDelete?: (id: string) => void }) {
   if (!generation) {
     return (
@@ -176,6 +225,12 @@ export function ResultView({ generation, onDelete }: { generation: Generation | 
         )}
       </div>
 
+      {generation.originalPrompt && (
+        <p className="mt-3 text-[11px] text-muted/70">
+          Rewritten from: “{generation.originalPrompt}”
+        </p>
+      )}
+
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
         <span className="text-xs text-muted">{generation.model}</span>
         {generation.simulated && (
@@ -183,7 +238,8 @@ export function ResultView({ generation, onDelete }: { generation: Generation | 
             SIMULATED
           </span>
         )}
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <ShareControl generation={generation} />
           <a
             href={url}
             download

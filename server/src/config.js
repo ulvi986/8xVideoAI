@@ -61,6 +61,16 @@ export const config = {
   geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '',
   geminiBaseUrl: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
 
+  /*
+   * Azure OpenAI, used only to rewrite prompts - never to generate media.
+   * These names match the repo-root .env that was already here.
+   */
+  azureEndpoint: process.env.AZURE_OPENAI_ENDPOINT || '',
+  azureApiKey: process.env.AZURE_AI_API_KEY || '',
+  azureModel: process.env.AZURE_AI_MODEL || '',
+  azureApiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-10-21',
+  azureTimeoutMs: Number(process.env.LLM_TIMEOUT_SECONDS || 60) * 1000,
+
   jobConcurrency: Number(process.env.JOB_CONCURRENCY || 2),
   providerTimeoutMs: Number(process.env.PROVIDER_TIMEOUT_MS || 300000),
   allowSimulator: bool(process.env.ALLOW_SIMULATOR, true),

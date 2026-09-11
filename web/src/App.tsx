@@ -1,7 +1,9 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth';
 import TopNav from './components/TopNav';
+import Landing from './pages/Landing';
 import Explore from './pages/Explore';
+import Community from './pages/Community';
 import VideoStudio from './pages/VideoStudio';
 import ImageStudio from './pages/ImageStudio';
 import AudioStudio from './pages/AudioStudio';
@@ -27,7 +29,9 @@ export default function App() {
         <TopNav />
         <main>
           <Routes>
-            <Route path="/" element={<Explore />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/explore" element={<Explore />} />
+            <Route path="/community" element={<Community />} />
             <Route path="/video" element={<VideoStudio />} />
             <Route path="/image" element={<ImageStudio />} />
             <Route path="/audio" element={<AudioStudio />} />

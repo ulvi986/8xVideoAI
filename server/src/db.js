@@ -63,6 +63,51 @@ CREATE TABLE IF NOT EXISTS credit_ledger (
 );
 `);
 
+/*
+ * Migrations. The database already exists in dev, so new columns are added
+ * in place rather than by recreating the table. Each step is guarded by
+ * PRAGMA table_info so a second boot is a no-op.
+ */
+function addColumnIfMissing(table, column, definition) {
+  const existing = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (existing.some(c => c.name === column)) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  return true;
+}
+
+export function migrate() {
+  const applied = [];
+
+  // Community: a generation can be published to a shared feed.
+  if (addColumnIfMissing('generations', 'published', 'INTEGER NOT NULL DEFAULT 0')) {
+    applied.push('generations.published');
+  }
+  if (addColumnIfMissing('generations', 'published_at', 'TEXT')) {
+    applied.push('generations.published_at');
+  }
+  if (addColumnIfMissing('generations', 'title', 'TEXT')) {
+    applied.push('generations.title');
+  }
+  // Prompt enhancement keeps the original, so the rewrite is never silent.
+  if (addColumnIfMissing('generations', 'original_prompt', 'TEXT')) {
+    applied.push('generations.original_prompt');
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS likes (
+      generation_id TEXT NOT NULL REFERENCES generations(id) ON DELETE CASCADE,
+      user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at    TEXT NOT NULL,
+      PRIMARY KEY (generation_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_likes_generation ON likes(generation_id);
+    CREATE INDEX IF NOT EXISTS idx_generations_published
+      ON generations(published, published_at DESC);
+  `);
+
+  return applied;
+}
+
 export const now = () => new Date().toISOString();
 
 /*

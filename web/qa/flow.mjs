@@ -11,6 +11,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const BASE = process.env.QA_BASE || 'http://localhost:5173';
+
+/* Local, free, deterministic - see the note at the first selectOption. */
+const SIM_MODELS = { video: 'sim-motion-1', image: 'sim-image-1', audio: 'sim-voice-1' };
 const SHOTS = path.join(import.meta.dirname, 'shots');
 fs.mkdirSync(SHOTS, { recursive: true });
 
@@ -33,10 +36,39 @@ page.on('console', msg => {
 page.on('pageerror', err => consoleErrors.push(`pageerror: ${err.message}`));
 
 try {
-  // ---- Explore ------------------------------------------------------
+  // ---- Landing ------------------------------------------------------
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  check('Explore renders', (await page.locator('text=Prompt in. Shot out.').count()) > 0);
-  await shot(page, '01-explore');
+  check('Landing headline renders', (await page.locator('text=Watch').first().count()) > 0);
+
+  // The hero words animate in; if the animation never runs they stay at
+  // opacity 0 and the page looks empty.
+  await page.waitForTimeout(900);
+  const heroVisible = await page.evaluate(() => {
+    const el = document.querySelector('.rise');
+    return el ? Number(getComputedStyle(el).opacity) : 0;
+  });
+  check('Hero animation settles visible', heroVisible > 0.9, `opacity=${heroVisible}`);
+
+  // .rise is applied to blocks and grids as well as headline words. If it ever
+  // forces inline-block again, the stats collapse into one column and the CTA
+  // row wraps alongside the paragraph.
+  const heroLayout = await page.evaluate(() => {
+    const stats = document.querySelector('dl.rise');
+    const para = document.querySelector('p.rise');
+    return {
+      statsDisplay: stats ? getComputedStyle(stats).display : 'missing',
+      paraDisplay: para ? getComputedStyle(para).display : 'missing',
+      statColumns: stats ? getComputedStyle(stats).gridTemplateColumns.split(' ').length : 0,
+    };
+  });
+  check(
+    'Hero stats stay a 3-column grid',
+    heroLayout.statsDisplay === 'grid' && heroLayout.statColumns === 3,
+    JSON.stringify(heroLayout)
+  );
+  check('Hero paragraph stays a block', heroLayout.paraDisplay === 'block');
+
+  await shot(page, '01-landing');
 
   // ---- Signup -------------------------------------------------------
   const email = `qa_${Date.now()}@8xbuild.ai`;
@@ -57,6 +89,11 @@ try {
   check('Header shows starting credits', /✦\s*10/.test(credits), credits.replace(/\s+/g, ' ').slice(-24));
 
   // ---- Create -------------------------------------------------------
+  // Pin the local renderer. With a Gemini key configured the first available
+  // model is Veo, and this suite runs often enough that letting it bill real
+  // video generations on every pass would be indefensible. Real providers are
+  // exercised separately by qa/real-providers.mjs.
+  await page.selectOption('select', SIM_MODELS.video);
   await page.fill('textarea', 'a lone astronaut walking across a neon desert at dusk');
   const button = page.locator('button[type=submit]', { hasText: 'Generate' });
   // Same reason: the button is correctly disabled until the prompt lands.
@@ -110,6 +147,7 @@ try {
   // ---- Image studio --------------------------------------------------
   await page.goto(`${BASE}/image`, { waitUntil: 'networkidle' });
   check('Image studio empty state', (await page.locator('text=Start creating with').count()) > 0);
+  await page.selectOption('select', SIM_MODELS.image);
   await page.fill('input[placeholder="Describe the scene you imagine"]', 'portrait in red neon rain');
   await page.click('button[type=submit]');
   await page.waitForSelector('img[alt="portrait in red neon rain"]', { timeout: 120000 });
@@ -118,6 +156,7 @@ try {
 
   // ---- Audio studio --------------------------------------------------
   await page.goto(`${BASE}/audio`, { waitUntil: 'networkidle' });
+  await page.selectOption('select', SIM_MODELS.audio);
   await page.fill('textarea', 'Welcome to 8xBuildAI. Describe a scene and watch it come to life.');
   await page.click('button[type=submit]');
   await page.waitForSelector('audio', { timeout: 120000 });
@@ -133,6 +172,62 @@ try {
   check('Unaffordable generation is blocked before clicking', disabled && shortfall > 0);
   await shot(page, '08-insufficient-credits');
 
+  // ---- Prompt enhancement (real Azure call) --------------------------
+  await page.goto(`${BASE}/video`, { waitUntil: 'networkidle' });
+  await page.selectOption('select', SIM_MODELS.video);
+  await page.fill('textarea', 'a cat in a city');
+  const before = await page.inputValue('textarea');
+  await page.click('button:has-text("Enhance prompt")');
+  await page.waitForFunction(
+    original => document.querySelector('textarea')?.value !== original,
+    before,
+    { timeout: 90000 }
+  );
+  const after = await page.inputValue('textarea');
+  check(
+    'Azure rewrites the prompt into something longer',
+    after.length > before.length * 3,
+    `${before.length} -> ${after.length} chars`
+  );
+  await shot(page, '12-enhanced');
+
+  check('Undo is offered after a rewrite', (await page.locator('button:has-text("Undo")').count()) > 0);
+  await page.click('button:has-text("Undo")');
+  check('Undo restores the original prompt', (await page.inputValue('textarea')) === before);
+
+  // ---- Community ------------------------------------------------------
+  // Publish the completed video from the History strip.
+  await page.click('button:has-text("History")').catch(() => {});
+  await page.waitForSelector('button:has-text("Share to community")', { timeout: 15000 });
+  await page.click('button:has-text("Share to community")');
+  await page.waitForSelector('button:has-text("In community")', { timeout: 15000 });
+  check('Generation can be shared to the community', true);
+
+  await page.goto(`${BASE}/community`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('article', { timeout: 15000 });
+  const postCount = await page.locator('article').count();
+  check('Community feed shows the shared post', postCount > 0, `${postCount} post(s)`);
+  await shot(page, '13-community');
+
+  // Like it, then confirm the count moved.
+  const likeButton = page.locator('article button[aria-label="Like"]').first();
+  await likeButton.click();
+  await page.waitForSelector('article button[aria-label="Unlike"]', { timeout: 10000 });
+  check('Liking a post works', true);
+
+  // Reload: the like must have persisted server-side, not just locally.
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('article', { timeout: 15000 });
+  check(
+    'Like persists across a reload',
+    (await page.locator('article button[aria-label="Unlike"]').count()) > 0
+  );
+
+  // The landing marquee is fed by the community feed.
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  check('Landing marquee picks up community work', (await page.locator('.marquee-track a').count()) > 0);
+
   // ---- Pricing & profile --------------------------------------------
   await page.goto(`${BASE}/pricing`, { waitUntil: 'networkidle' });
   check('Pricing renders three plans', (await page.locator('text=/STARTER|PLUS|ULTRA/').count()) >= 3);
@@ -146,7 +241,15 @@ try {
   await page.context().clearCookies();
   await page.evaluate(() => localStorage.clear());
   await page.goto(`${BASE}/video`, { waitUntil: 'networkidle' });
-  check('Signed-out user is redirected to sign in', page.url().includes('/signin'));
+  // The redirect is a client-side <Navigate>, so it can land a tick after
+  // the network goes idle. Wait for it rather than sampling the URL once.
+  let redirected = true;
+  try {
+    await page.waitForURL('**/signin**', { timeout: 10000 });
+  } catch {
+    redirected = false;
+  }
+  check('Signed-out user is redirected to sign in', redirected, page.url());
 
   // ---- Responsive -----------------------------------------------------
   await page.setViewportSize({ width: 390, height: 844 });

@@ -80,3 +80,52 @@ Reason:
 not justified at this scale, and it would add a process the reviewer has to
 start before the app works. Jobs survive restart because state lives in SQLite;
 anything left PROCESSING at boot is re-queued.
+
+## 008 — Prompt rewriting runs on Azure, generation runs on Gemini
+
+Decision:
+`server/src/azure.js` sends the user's prompt to Azure OpenAI
+(`gpt-5-mini-2`, deployment surface) and returns a rewritten one. It never
+generates media. Media generation stays with Gemini/Veo or the local renderer.
+
+Reason:
+The Azure credentials were already in this repo's `.env` for another project
+and are a good fit for a text task. Splitting the two also means a rewriter
+outage cannot stop generation — `/api/enhance` failing leaves the original
+prompt intact and the Generate button still works.
+
+Notes:
+- The deployment is a reasoning model: reasoning tokens come out of the same
+  budget as the answer, so `max_completion_tokens` is set to 2000. A tight cap
+  returns an empty message with `finish_reason: "length"` rather than a short
+  answer, which is handled explicitly.
+- The original prompt is stored on the generation (`original_prompt`) and shown
+  under the result. A rewrite is never silent.
+
+## 009 — Community is a flag on a generation, not a separate entity
+
+Decision:
+Publishing sets `published`/`published_at` on the existing `generations` row.
+`likes` is a join table keyed on (generation, user). There is no separate
+"post" table.
+
+Reason:
+A post *is* a generation someone chose to show. Copying it into a second table
+would create two sources of truth for the same media file and make deletion
+ambiguous. Unpublishing is one UPDATE, and deleting a generation removes the
+post with it via ON DELETE CASCADE.
+
+Audio is excluded from the feed: it is a visual grid, and a row of identical
+audio players adds nothing. The server enforces this, not just the UI.
+
+## 010 — The test suite uses the local renderer, not the real models
+
+Decision:
+`web/qa/flow.mjs` explicitly selects `sim-*` models. Real providers are
+exercised by `web/qa/real-providers.mjs`, which is run on demand.
+
+Reason:
+Once a Gemini key is configured, the first available model is Veo. A suite that
+runs on every change would then bill a real video generation every pass and take
+minutes. The free suite stays fast and deterministic; the billed one stays
+deliberate.

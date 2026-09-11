@@ -42,6 +42,10 @@ export interface Generation {
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
+  published: boolean;
+  publishedAt: string | null;
+  title: string | null;
+  originalPrompt: string | null;
 }
 
 export interface Plan {
@@ -61,13 +65,29 @@ export interface Plan {
   unlimited: { name: string; included: boolean; tag?: string }[];
 }
 
+export interface CommunityPost {
+  id: string;
+  kind: Kind;
+  prompt: string;
+  title: string | null;
+  model: string;
+  simulated: boolean;
+  outputUrl: string;
+  thumbnailUrl: string | null;
+  publishedAt: string;
+  author: { handle: string; displayName: string };
+  likes: number;
+  likedByMe: boolean;
+  mine: boolean;
+}
+
 export interface Catalog {
   models: Model[];
   voices: { id: string; name: string; description: string }[];
   aspectRatios: string[];
   costs: Record<Kind, number>;
   plans: Plan[];
-  providerStatus: { gemini: boolean; simulator: boolean };
+  providerStatus: { gemini: boolean; simulator: boolean; enhancer: boolean };
 }
 
 /* The API's error shape is uniform, so surface its message rather than a generic one. */
@@ -166,4 +186,27 @@ export const api = {
 
   deleteGeneration: (id: string) =>
     request<{ ok: true }>(`/api/generations/${id}`, { method: 'DELETE' }),
+
+  /* Rewrites a prompt with Azure OpenAI. Slow enough to need its own spinner. */
+  enhance: (kind: Kind, prompt: string) =>
+    request<{ original: string; enhanced: string; model: string }>('/api/enhance', {
+      method: 'POST',
+      body: JSON.stringify({ kind, prompt }),
+    }),
+
+  publish: (id: string, published: boolean, title?: string) =>
+    request<{ generation: Generation }>(`/api/generations/${id}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ published, title }),
+    }),
+
+  community: (kind?: 'video' | 'image', sort: 'new' | 'top' = 'new') =>
+    request<{ posts: CommunityPost[] }>(
+      `/api/community?sort=${sort}${kind ? `&kind=${kind}` : ''}`
+    ),
+
+  like: (id: string) =>
+    request<{ likes: number; likedByMe: boolean }>(`/api/community/${id}/like`, {
+      method: 'POST',
+    }),
 };

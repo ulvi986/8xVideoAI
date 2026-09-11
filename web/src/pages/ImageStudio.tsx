@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useStudio } from '../useStudio';
 import { useAuth } from '../auth';
 import { HistoryStrip, ResultView } from '../components/Studio';
+import EnhanceButton from '../components/EnhanceButton';
 
 /*
  * Image generation docks its prompt bar to the bottom of the canvas instead
@@ -13,6 +14,7 @@ export default function ImageStudio() {
   const studio = useStudio('image');
 
   const [prompt, setPrompt] = useState('');
+  const [originalPrompt, setOriginalPrompt] = useState<string | null>(null);
   const [model, setModel] = useState('');
   const [aspect, setAspect] = useState('1:1');
 
@@ -33,8 +35,11 @@ export default function ImageStudio() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-    const created = await studio.generate({ prompt, model, aspectRatio: aspect });
-    if (created) setPrompt('');
+    const created = await studio.generate({ prompt, originalPrompt, model, aspectRatio: aspect });
+    if (created) {
+      setPrompt('');
+      setOriginalPrompt(null);
+    }
   }
 
   const hasWork = studio.generations.length > 0;
@@ -99,6 +104,17 @@ export default function ImageStudio() {
                   </option>
                 ))}
               </select>
+
+              <EnhanceButton
+                kind="image"
+                prompt={prompt}
+                compact
+                available={Boolean(studio.catalog?.providerStatus.enhancer)}
+                onChange={(next, original) => {
+                  setPrompt(next);
+                  setOriginalPrompt(original);
+                }}
+              />
 
               {(studio.catalog?.aspectRatios ?? ['1:1']).map(r => (
                 <button

@@ -125,9 +125,63 @@ no such limit, plus an 8MB guard with a real error message.
 
 ## Known limitations (not defects)
 
-- **No real video model is reachable.** No `GEMINI_API_KEY` was supplied, so
-  every generation runs on the local simulator. Output is watermarked
-  `SIMULATED` and flagged `simulated: true`.
-- **The local audio model is not speech.** It synthesises a tone bed. There is
-  no offline TTS engine here, and inventing one would misrepresent the output.
+- **The local fallback models are still fallbacks.** With no key configured the
+  `sim-*` models serve the flow; their output is watermarked `SIMULATED` and
+  flagged `simulated: true`. `sim-voice-1` in particular synthesises a tone bed,
+  not speech — there is no offline TTS engine here, and inventing one would
+  misrepresent the output.
+- **Veo is occasionally flaky.** See the retry note below. Failures refund.
 - **Checkout is presentational.** Plans render; no payment provider is wired.
+
+---
+
+## BUG-006 — Landing hero collapsed onto one line
+
+**Severity:** Medium — the new landing page looked broken above the fold.
+
+**Steps to reproduce:** open `/` at 1440px.
+
+**Expected:** headline, paragraph, a centred CTA row, then a 3-column stat row.
+
+**Actual:** the paragraph and the CTA buttons sat side by side on one line, and
+the three stats stacked into a single column.
+
+**Cause:** the `.rise` entrance-animation class set `display: inline-block`.
+That is correct for the per-word headline spans it was written for, but the same
+class is also applied to a `<p>`, a flex row and a `<dl class="grid">`. Forcing
+inline-block on those overrode `display: grid` and let the block elements flow
+inline.
+
+**Fix:** `.rise` now animates only. A separate `.rise-word` carries
+`display: inline-block` for the headline spans. A QA check asserts the computed
+`display` of the hero stats is `grid` with 3 columns and the paragraph is
+`block`, so it cannot regress silently.
+
+---
+
+## Resolved limitation — real generation is live
+
+`GEMINI_API_KEY` is now configured and all three real providers were verified
+end to end by `web/qa/real-providers.mjs`:
+
+| Kind | Model | Result |
+|---|---|---|
+| image | `gemini-2.5-flash-image` | 12s, 1.9MB PNG, 1024×1024 |
+| audio | `gemini-2.5-flash-preview-tts` | 8s, 250KB WAV, 24kHz mono |
+| video | `veo-3.1-fast-generate-preview` | 52s, 7.3MB MP4, 1280×720, 24fps, **with an AAC audio track** |
+
+The audio track is the clearest proof it is not the local renderer — the
+simulator produces silent 30fps clips around 190KB.
+
+**One real failure seen along the way.** The first Veo request came back
+`Video generation failed due to an internal server issue` after ~40s. That is
+Google's error, surfaced verbatim, and the 5 credits were refunded
+automatically. An identical retry with a different prompt succeeded. Worth
+knowing: Veo fails occasionally and the UI must not treat that as fatal — it
+does not.
+
+**Note on an earlier claim.** Two sessions of this build reported "no
+`GEMINI_API_KEY`". The key is written as `GEMINI_API_KEY = "..."` with spaces
+around the `=`; the check used was `^GEMINI_API_KEY=`, which does not match that
+form. The server's own `.env` parser trims whitespace and strips quotes, so it
+reads the file correctly either way — only the diagnostic grep was too strict.

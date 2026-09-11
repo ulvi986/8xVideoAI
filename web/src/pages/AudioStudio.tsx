@@ -3,12 +3,14 @@ import { Navigate } from 'react-router-dom';
 import { useStudio } from '../useStudio';
 import { useAuth } from '../auth';
 import { Field, GenerateButton, HistoryStrip, ModelPicker, ResultView } from '../components/Studio';
+import EnhanceButton from '../components/EnhanceButton';
 
 export default function AudioStudio() {
   const { user, loading: authLoading } = useAuth();
   const studio = useStudio('audio');
 
   const [script, setScript] = useState('');
+  const [originalPrompt, setOriginalPrompt] = useState<string | null>(null);
   const [model, setModel] = useState('');
   const [voice, setVoice] = useState('kore');
   const [tab, setTab] = useState<'history' | 'how'>('history');
@@ -28,7 +30,7 @@ export default function AudioStudio() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    await studio.generate({ prompt: script, model, voice });
+    await studio.generate({ prompt: script, originalPrompt, model, voice });
   }
 
   return (
@@ -48,6 +50,16 @@ export default function AudioStudio() {
               className="w-full resize-none rounded-lg border border-line bg-panel2 p-3 text-sm outline-none placeholder:text-muted/60 focus:border-accent"
             />
           </Field>
+
+          <EnhanceButton
+            kind="audio"
+            prompt={script}
+            available={Boolean(studio.catalog?.providerStatus.enhancer)}
+            onChange={(next, original) => {
+              setScript(next);
+              setOriginalPrompt(original);
+            }}
+          />
 
           <ModelPicker models={models} value={model} onChange={setModel} />
 

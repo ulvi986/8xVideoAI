@@ -21,19 +21,25 @@
 - [x] Fixed BUG-001 stuck-on-Queued race, BUG-002 47MB video, BUG-005 upload overflow
 - [x] README + BUGS.md
 
+- [x] Animated landing page — aurora hero, staggered reveal, live marquee
+- [x] Prompt rewriting via Azure (`/api/enhance`) with original kept + undo
+- [x] Community — publish, feed, filters, sort, likes, lightbox
+- [x] Real generation enabled — Veo 3.1, Gemini image, Gemini TTS, all verified
+- [x] Split QA: free local suite (31 checks) + billed real-provider suite (7)
+- [x] `check:gemini` / `check:azure` diagnostic scripts
+- [x] Fixed BUG-006 landing hero layout
+
 ## In Progress
 
 Nothing — the build is at a stable point.
 
 ## Blocked
 
-- [ ] Real video generation via Gemini — **no `GEMINI_API_KEY` supplied**.
-      The `.env` in the repo root belongs to a different project (InvestVCS,
-      Azure OpenAI). The adapter is written and wired; it needs only the key.
-      Until then gemini models report `available: false` with the reason, and
-      the local simulator serves the flow.
+Nothing.
 
 ## Next
 
-- [ ] Exercise the Gemini adapter against the live API once a key exists
-- [ ] Deploy — needs SESSION_SECRET and object storage for generated media
+- [ ] Rate-limit `/api/enhance` — it spends Azure tokens per click
+- [ ] Moderation / reporting on the community feed
+- [ ] Object storage — Veo files are ~7MB and local disk will not survive deploy
+- [ ] Deploy — needs SESSION_SECRET

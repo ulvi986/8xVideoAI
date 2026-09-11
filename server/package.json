@@ -8,7 +8,9 @@
   },
   "scripts": {
     "start": "node --no-warnings src/index.js",
-    "dev": "node --no-warnings --watch src/index.js"
+    "dev": "node --no-warnings --watch src/index.js",
+    "check:gemini": "node scripts/check-gemini.js",
+    "check:azure": "node scripts/check-azure.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -12,6 +12,7 @@ const BUILT = [
   { to: '/image', label: 'Image' },
   { to: '/video', label: 'Video' },
   { to: '/audio', label: 'Audio' },
+  { to: '/community', label: 'Community' },
 ];
 
 const NOT_BUILT = ['MCP', 'Genjutsu', 'Effects', 'Cinema Studio', 'Marketing Studio'];
