@@ -29,6 +29,24 @@ function describeHttpError(status, body) {
     return new ProviderError(`Gemini rejected the API key: ${detail}`, { status });
   }
   if (status === 429) {
+    /*
+     * Google returns 429 for two very different things:
+     *
+     *   - a real rate limit, which clears on its own in seconds
+     *   - an exhausted quota or depleted prepaid balance, which never clears
+     *     without someone topping up the account
+     *
+     * Only the message distinguishes them. Treating the second as retryable
+     * left jobs spinning on "Retrying…" until they hit the time limit, so the
+     * user saw a long wait and a timeout instead of "your billing ran out".
+     */
+    const terminal = /deplet|exhaust|billing|prepayment|insufficient|quota exceeded|free tier/i.test(detail);
+    if (terminal) {
+      return new ProviderError(
+        `Google rejected the request: ${detail}`,
+        { status, retryable: false }
+      );
+    }
     return new ProviderError(`Gemini rate limit reached: ${detail}`, { status, retryable: true });
   }
   if (status >= 500) {

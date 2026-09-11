@@ -73,15 +73,26 @@ export default function Result({
 
       <div className="mt-4">
         {pending && (
-          <div className="flex items-center gap-2.5 text-[13px] text-muted">
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-border border-t-accent" />
-            <span className="pulse-soft">
-              {generation.status === 'QUEUED' ? 'Queued' : 'Generating'}
-            </span>
-            <span className="tabular-nums">
-              <Elapsed from={generation.startedAt ?? generation.createdAt} />
-              {timeoutSeconds ? <span className="text-muted/70"> / {timeoutSeconds}s max</span> : null}
-            </span>
+          <div>
+            <div className="flex items-center gap-2.5 text-[13px] text-muted">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-border border-t-accent" />
+              <span className="pulse-soft">
+                {generation.status === 'QUEUED' ? 'Queued' : 'Generating'}
+              </span>
+              <span className="tabular-nums">
+                <Elapsed from={generation.startedAt ?? generation.createdAt} />
+                {timeoutSeconds ? <span className="text-muted/70"> / {timeoutSeconds}s max</span> : null}
+              </span>
+            </div>
+
+            {/*
+              A job can be alive but struggling — rate limited, or the provider
+              briefly unreachable. The server records why on each retry. Showing
+              it beats a silent spinner that looks identical to healthy progress.
+            */}
+            {generation.error && (
+              <p className="mt-2 text-[12px] text-muted">{generation.error}</p>
+            )}
           </div>
         )}
 

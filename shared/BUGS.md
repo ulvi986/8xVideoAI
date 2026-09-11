@@ -325,3 +325,48 @@ assertion timing is not the whole story either. **Not root-caused.** The check
 now dumps the server's view of the feed when it fails — token present, HTTP
 status, post count, likes — so the next occurrence should say which half is
 wrong instead of needing this investigation repeated.
+
+---
+
+## BUG-011 — A permanent billing failure was retried as if it were transient
+
+**Severity:** High — every generation appeared to hang, then blamed the wrong
+thing.
+
+**Steps to reproduce:** let the Google AI Studio prepaid balance run out, then
+generate anything.
+
+**Expected:** fail quickly, say the billing ran out, refund.
+
+**Actual:** the job sat at PROCESSING for the full 120s ceiling, then failed
+with "Timed out after 120s. The model was still working" — which was false.
+The model was not working; Google had rejected every call instantly. The UI
+showed a silent spinner the whole time, identical to healthy progress.
+
+**Cause:** two mistakes compounding.
+
+1. Google returns **429 for two unrelated conditions**: a real rate limit,
+   which clears in seconds, and an exhausted quota or depleted prepaid
+   balance, which never clears without someone topping up. The adapter
+   classified all 429s as `retryable`, so a permanent failure was retried
+   until the time limit ended it.
+2. The retry reason was written to the row but never rendered. A struggling
+   job and a healthy one looked exactly the same.
+
+**Fix:**
+1. `describeHttpError` inspects the 429 message and treats
+   deplet/exhaust/billing/prepayment/insufficient/quota-exceeded/free-tier as
+   terminal — fail immediately, refund immediately, quote Google verbatim.
+   Genuine rate limits still retry.
+2. The pending state renders `generation.error`, so a retrying job says why
+   instead of spinning silently.
+
+**Verified in production:** 14s to fail with the exact Google message, and a
+full credit refund. Previously 120s and a misleading message.
+
+**Contributing cause worth recording:** the balance was drained by this
+project's own testing. Veo renders are expensive and several were run against
+the live account, including two started deliberately to test the 50s cap and
+then discarded — those still bill. Test suites that call paid providers should
+be run knowingly; `qa/flow.mjs` pins the local renderer for exactly this
+reason, but `qa/real-providers.mjs` and the timeout experiments do not.
