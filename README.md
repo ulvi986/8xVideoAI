@@ -1,10 +1,10 @@
 # 8xBuildAI
 
 A creative-AI generation platform — text and images in, video / image / audio
-out. Built from the Higgsfield reference screenshots in
-`higgsfieldscreenshots/`.
+out. Scope came from the Higgsfield screenshots in `higgsfieldscreenshots/`;
+the interface was later rebuilt on the ChatGPT / Perplexity reference.
 
-![video studio](web/qa/shots/05-completed.png)
+![the composer](web/qa/shots/14-theme-light.png)
 
 ## Run it
 
@@ -81,18 +81,26 @@ shared/     PROJECT, DESIGN, STATUS, TASKS, DECISIONS, BUGS
 ```bash
 cd web
 npx playwright install chromium   # once
-node qa/flow.mjs                  # 31 checks, free, ~1 min
+node qa/flow.mjs                  # 36 checks, free, ~2 min
 node qa/real-providers.mjs        # 7 checks against the real models — billed
 ```
 
 `flow.mjs` drives a real browser through signup → prompt → enhance → generate →
 processing → completed → preview → download → publish → like, plus credit
-limits, auth redirects, pricing, profile and mobile layout. It pins the local
-renderer deliberately, so running it often costs nothing.
+limits, auth redirects, unknown routes, mobile layout, and that light and dark
+actually render differently. It pins the local renderer deliberately, so running
+it often costs nothing.
 
 `real-providers.mjs` is the opt-in one: it spends real credits on Veo and Gemini
 and asserts the files that come back are genuine — `simulated: false`, and large
 enough to be real media.
+
+## Interface
+
+Rebuilt on the ChatGPT / Perplexity reference: one composer that is also the
+home screen, a slim rail, an 820px content column, Perplexity brand colours in
+light and dark, and one accent on one action. See `shared/RESEARCH.md` for the
+patterns and `shared/DESIGN.md` for the tokens.
 
 ## Notable decisions
 

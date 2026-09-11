@@ -29,6 +29,15 @@
 - [x] `check:gemini` / `check:azure` diagnostic scripts
 - [x] Fixed BUG-006 landing hero layout
 
+- [x] Wrote `RESEARCH.md` — the artifact `.agents/ui.md` requires before UI work
+- [x] Rebuilt the whole interface on the ChatGPT/Perplexity reference
+- [x] Three studio pages + three form rails collapsed into one composer
+- [x] Top nav replaced by a rail (desktop) / bottom bar (mobile)
+- [x] Profile replaced by Library; `/explore` removed
+- [x] Light + dark palettes on Perplexity brand colours, both verified
+- [x] Fixed BUG-007 (light theme never rendered) and BUG-008 (signed-out dead end)
+- [x] QA rewritten for the new UI — 36 checks
+
 ## In Progress
 
 Nothing — the build is at a stable point.

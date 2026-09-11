@@ -2,18 +2,19 @@
 
 ## Current Phase
 
-Feature-complete MVP, running locally on real models.
+Feature-complete MVP on real models, interface rebuilt on the
+ChatGPT/Perplexity reference.
 
 ## Working
 
-- **Animated landing page** — aurora hero, staggered headline, scroll reveals,
-  count-up stats, and a marquee fed by real community work
+- **One composer** — it is the home screen and the whole creation surface;
+  mode, model and options live inside it
 - **Real generation** — Veo 3.1 video, Gemini image, Gemini speech
 - **Prompt rewriting** — Azure `gpt-5-mini-2` turns a rough prompt into a shot
   description; the original is kept, shown, and undoable
 - **Community** — publish a video or image, browse the feed, filter by kind,
   sort by newest or most liked, like/unlike, lightbox
-- Explore, three studios, pricing, profile, auth
+- Home, unified studio (video/image/voice), community, library, pricing, auth
 - Credits — 10 on signup, deducted on queue, refunded on failure
 - Generation lifecycle with polling, preview and download
 
@@ -21,7 +22,7 @@ Feature-complete MVP, running locally on real models.
 
 | Suite | Scope | Result |
 |---|---|---|
-| `web/qa/flow.mjs` | critical flow in a real browser, local models | **31/31** |
+| `web/qa/flow.mjs` | critical flow, redesign criteria, both themes | **36/36** |
 | `web/qa/real-providers.mjs` | Veo + Gemini image + Gemini TTS + Azure | **7/7** |
 | `server/npm run check:gemini` | key auth + model availability | all 4 models ok |
 | `server/npm run check:azure` | rewriter round trip | ok, ~6s |

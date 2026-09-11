@@ -1,75 +1,52 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError, type Catalog, type Generation, type Kind } from './api';
-import { useAuth } from './auth';
+import { useEffect, useState } from 'react';
+import { api, type Catalog, type Generation } from './api';
 
 const TERMINAL = new Set(['COMPLETED', 'FAILED']);
 const POLL_MS = 1500;
 
-/*
- * Owns everything a studio page needs: the model catalogue, this user's
- * history for that kind, submitting a generation, and polling it to a
- * terminal state.
- *
- * Polling is driven by a single interval over all unfinished jobs rather
- * than one timer per job, so leaving several running does not multiply
- * requests.
- */
-export function useStudio(kind: Kind) {
-  const { user, setCredits } = useAuth();
-  /*
-   * Depend on the user's id, not the user object. Credits change on every
-   * generation, and keying the initial load on the whole object made it
-   * refetch the list constantly and race the poller.
-   */
-  const userId = user?.id ?? null;
-
+/* The model catalogue, fetched once. */
+export function useCatalog() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [generations, setGenerations] = useState<Generation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Avoids a state update after unmount when a poll lands late.
-  const alive = useRef(true);
   useEffect(() => {
-    alive.current = true;
+    let alive = true;
+    api
+      .catalog()
+      .then(c => alive && setCatalog(c))
+      .catch(() => {});
     return () => {
-      alive.current = false;
+      alive = false;
     };
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [cat, list] = await Promise.all([
-        api.catalog(kind),
-        userId ? api.listGenerations(kind) : Promise.resolve({ generations: [] }),
-      ]);
-      if (!alive.current) return;
-      setCatalog(cat);
-      setGenerations(list.generations);
-      setActiveId(current => current ?? list.generations[0]?.id ?? null);
-      setError(null);
-    } catch (err) {
-      if (alive.current) setError(err instanceof Error ? err.message : 'Could not load.');
-    } finally {
-      if (alive.current) setLoading(false);
-    }
-  }, [kind, userId]);
+  return catalog;
+}
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  /* Poll anything still in flight. */
+/*
+ * Polls every unfinished generation on one interval, rather than one timer
+ * per job.
+ *
+ * Two invariants here are load-bearing, both from BUG-001:
+ *
+ *  - status only ever moves forward. A response that started before a job
+ *    finished must never drag it back to QUEUED.
+ *  - `setCredits` is expected to no-op when the value is unchanged. If it
+ *    returns a fresh user object every tick, every hook keyed on `user`
+ *    re-fetches about once a second and races this poller.
+ */
+export function usePolling(
+  generations: Generation[],
+  setGenerations: React.Dispatch<React.SetStateAction<Generation[]>>,
+  setCredits: (credits: number) => void
+) {
   useEffect(() => {
     const pending = generations.filter(g => !TERMINAL.has(g.status));
     if (pending.length === 0) return;
 
+    let alive = true;
     const timer = setInterval(async () => {
       const results = await Promise.allSettled(pending.map(g => api.getGeneration(g.id)));
-      if (!alive.current) return;
+      if (!alive) return;
 
       const updates = new Map<string, Generation>();
       let latestCredits: number | null = null;
@@ -81,8 +58,6 @@ export function useStudio(kind: Kind) {
       }
       if (updates.size === 0) return;
 
-      // Status only ever moves forward. A response that started before a
-      // job finished must never drag it back to QUEUED.
       setGenerations(current =>
         current.map(g => {
           const fresh = updates.get(g.id);
@@ -90,61 +65,14 @@ export function useStudio(kind: Kind) {
           return TERMINAL.has(g.status) && !TERMINAL.has(fresh.status) ? g : fresh;
         })
       );
-      // A failed job refunds; reflect that without a second round trip.
+
+      // A failed job refunds, so keep the balance honest without a round trip.
       if (latestCredits !== null) setCredits(latestCredits);
     }, POLL_MS);
 
-    return () => clearInterval(timer);
-  }, [generations, setCredits]);
-
-  const generate = useCallback(
-    async (payload: Record<string, unknown>) => {
-      setSubmitting(true);
-      setError(null);
-      try {
-        const { generation, credits } = await api.createGeneration({ kind, ...payload });
-        if (!alive.current) return null;
-        setGenerations(current => [generation, ...current]);
-        setActiveId(generation.id);
-        setCredits(credits);
-        return generation;
-      } catch (err) {
-        if (alive.current) {
-          setError(err instanceof ApiError ? err.message : 'Generation could not be started.');
-        }
-        return null;
-      } finally {
-        if (alive.current) setSubmitting(false);
-      }
-    },
-    [kind, setCredits]
-  );
-
-  const remove = useCallback(async (id: string) => {
-    setGenerations(current => current.filter(g => g.id !== id));
-    setActiveId(current => (current === id ? null : current));
-    try {
-      await api.deleteGeneration(id);
-    } catch {
-      // Put it back if the server refused, so the UI does not lie.
-      void load();
-    }
-  }, [load]);
-
-  const active = generations.find(g => g.id === activeId) ?? null;
-
-  return {
-    catalog,
-    generations,
-    active,
-    activeId,
-    setActiveId,
-    loading,
-    submitting,
-    error,
-    setError,
-    generate,
-    remove,
-    reload: load,
-  };
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [generations, setGenerations, setCredits]);
 }

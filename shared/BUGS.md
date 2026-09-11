@@ -185,3 +185,50 @@ does not.
 around the `=`; the check used was `^GEMINI_API_KEY=`, which does not match that
 form. The server's own `.env` parser trims whitespace and strips quotes, so it
 reads the file correctly either way — only the diagnostic grep was too strict.
+
+---
+
+## BUG-007 — The light theme never rendered
+
+**Severity:** High — the redesign's primary look was unreachable.
+
+**Steps to reproduce:** open the app with the OS set to light mode.
+
+**Expected:** Paper White `#FBFAF4` ground, Offblack text.
+
+**Actual:** the dark palette, in both themes.
+
+**Cause:** the dark tokens were written as `@media (prefers-color-scheme: dark)
+{ @theme { … } }`. Tailwind v4's `@theme` is a compile-time directive — it is
+hoisted out of the media query and emitted unconditionally, so the dark values
+overwrote the light ones and the query never gated anything.
+
+**Fix:** `@theme` holds the light palette only. Dark overrides the same custom
+property names in a plain `:root` block inside the media query, which is a
+runtime cascade and actually switches.
+
+**How it hid:** the first contrast check passed in both themes — because both
+*were* dark, and dark has fine contrast. A check that measures one theme at a
+time cannot see that the two are identical. There are now two extra assertions:
+the themes must differ, and light must be exactly `rgb(251, 250, 244)`.
+
+---
+
+## BUG-008 — Signed-out visitors could not start
+
+**Severity:** High — the sign-up path from the home page was unreachable.
+
+**Steps to reproduce:** open `/` signed out, type a prompt, try to send.
+
+**Expected:** sending takes you to sign-up.
+
+**Actual:** the send button was disabled, and a red "Needs 5 credits; you have
+0" sat under the composer on first load.
+
+**Cause:** the composer gates sending on `credits >= cost`. A signed-out
+visitor has no balance, so the gate was permanently closed — and `Home` only
+redirects to sign-in *inside* the submit handler, which could never fire.
+
+**Fix:** the composer takes a `signedIn` prop. When false it skips the credit
+gate and hides the cost readout and the warning; submitting hands off to the
+parent, which redirects. Three QA checks cover it.

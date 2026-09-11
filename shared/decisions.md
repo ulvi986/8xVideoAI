@@ -129,3 +129,23 @@ Once a Gemini key is configured, the first available model is Veo. A suite that
 runs on every change would then bill a real video generation every pass and take
 minutes. The free suite stays fast and deterministic; the billed one stays
 deliberate.
+
+## 011 — Interface rebuilt on the ChatGPT / Perplexity reference
+
+Decision:
+The presentation layer was rewritten. Three studio pages and their 360px form
+rails collapsed into one composer, which is also the home screen. The top nav
+became a slim rail. Light became the default theme, on Perplexity's brand
+palette. `Explore` and `Profile` were deleted; `Library` replaces the latter.
+
+Reason:
+Requested. The structural lesson from both references (`RESEARCH.md`) is that
+mode is a property of the input, not a destination — which removed two nearly
+identical pages rather than restyling them. Everything behind the API is
+untouched: same endpoints, same schema, no earlier decision reversed.
+
+Constraint that came out of it:
+One accent on one action. A QA check counts filled accent backgrounds on a page
+and fails above one, because the previous design used the accent on nav links,
+borders, badges, chips and buttons at once, which left nothing reading as
+primary.
