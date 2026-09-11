@@ -95,6 +95,34 @@ it often costs nothing.
 and asserts the files that come back are genuine — `simulated: false`, and large
 enough to be real media.
 
+## Deploy
+
+Everything runs on Vercel as one project: the static site plus a single
+serverless function (`api/[...slug].js`) serving the same Express app.
+
+```bash
+vercel deploy --prod
+```
+
+Required production environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | the database — libSQL, same SQLite dialect |
+| `BLOB_READ_WRITE_TOKEN` | generated media (set by `vercel storage connect`) |
+| `GEMINI_API_KEY` | generation |
+| `AZURE_*` | prompt rewriting |
+| `SESSION_SECRET` | session signing |
+| `ALLOW_SIMULATOR=false` | ffmpeg cannot run on Vercel; see below |
+
+Locally none of these are needed: the database falls back to a plain file and
+media to local disk, so `npm start` works with no account.
+
+**The `sim-*` models are local-only.** They shell out to ffmpeg, which is not
+available in the serverless runtime, so in production a missing
+`GEMINI_API_KEY` means no generation at all rather than watermarked local
+output. `shared/decisions.md` 013 has the reasoning.
+
 ## Interface
 
 Rebuilt on the ChatGPT / Perplexity reference: one composer that is also the
