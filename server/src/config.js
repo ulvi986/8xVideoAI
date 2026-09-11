@@ -77,6 +77,16 @@ export const config = {
   azureApiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-10-21',
   azureTimeoutMs: Number(process.env.LLM_TIMEOUT_SECONDS || 60) * 1000,
 
+  /*
+   * libSQL. Empty locally, where db.js falls back to a plain file so the
+   * project runs with no account and no network.
+   */
+  databaseUrl: process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || '',
+  databaseAuthToken: process.env.TURSO_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN || '',
+
+  // Vercel Blob. Absent locally, where media is written to disk instead.
+  blobToken: process.env.BLOB_READ_WRITE_TOKEN || '',
+
   jobConcurrency: Number(process.env.JOB_CONCURRENCY || 2),
   providerTimeoutMs: Number(process.env.PROVIDER_TIMEOUT_MS || 300000),
   allowSimulator: bool(process.env.ALLOW_SIMULATOR, true),

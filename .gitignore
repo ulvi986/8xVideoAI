@@ -27,3 +27,6 @@ server/data/
 # Tooling caches created during the build (hundreds of MB)
 .npm-cache/
 .playwright/
+
+.vercel
+.env*

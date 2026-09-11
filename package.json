@@ -1,16 +1,12 @@
 {
-  "name": "8xbuildai-server",
-  "version": "1.0.0",
+  "name": "8xbuildai",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
   },
   "scripts": {
-    "start": "node --no-warnings src/index.js",
-    "dev": "node --no-warnings --watch src/index.js",
-    "check:gemini": "node scripts/check-gemini.js",
-    "check:azure": "node scripts/check-azure.js"
+    "build": "npm --prefix web install --no-audit --no-fund && npm --prefix web run build"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

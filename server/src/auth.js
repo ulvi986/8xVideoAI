@@ -18,16 +18,21 @@ export function verifyPassword(password, hash, salt) {
 }
 
 /*
- * Session token = random id + HMAC over it. The HMAC means a token that was
- * not issued by this server is rejected without a database lookup.
+ * Session token = random id + HMAC over it. The HMAC means a token this server
+ * did not issue is rejected without a database lookup.
  */
-export function issueSession(userId) {
+export async function issueSession(userId) {
   const id = crypto.randomBytes(24).toString('hex');
   const sig = crypto.createHmac('sha256', config.sessionSecret).update(id).digest('hex').slice(0, 32);
   const token = `${id}.${sig}`;
   const expires = new Date(Date.now() + config.sessionTtlMs).toISOString();
-  db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
-    .run(token, userId, now(), expires);
+  await db.run(
+    'INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)',
+    token,
+    userId,
+    now(),
+    expires
+  );
   return { token, expiresAt: expires };
 }
 
@@ -41,19 +46,19 @@ function tokenIsWellFormed(token) {
   return crypto.timingSafeEqual(a, b);
 }
 
-export function userForToken(token) {
+export async function userForToken(token) {
   if (!token || !tokenIsWellFormed(token)) return null;
-  const session = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+  const session = await db.get('SELECT * FROM sessions WHERE token = ?', token);
   if (!session) return null;
   if (new Date(session.expires_at).getTime() < Date.now()) {
-    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    await db.run('DELETE FROM sessions WHERE token = ?', token);
     return null;
   }
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(session.user_id) || null;
+  return (await db.get('SELECT * FROM users WHERE id = ?', session.user_id)) || null;
 }
 
-export function revokeSession(token) {
-  db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+export async function revokeSession(token) {
+  await db.run('DELETE FROM sessions WHERE token = ?', token);
 }
 
 function bearer(req) {
@@ -62,10 +67,14 @@ function bearer(req) {
 }
 
 /* Attaches req.user when a valid token is present, but never rejects. */
-export function attachUser(req, _res, next) {
-  req.token = bearer(req);
-  req.user = req.token ? userForToken(req.token) : null;
-  next();
+export async function attachUser(req, _res, next) {
+  try {
+    req.token = bearer(req);
+    req.user = req.token ? await userForToken(req.token) : null;
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 /* Rejects when there is no valid session. */

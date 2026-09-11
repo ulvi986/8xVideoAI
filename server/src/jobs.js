@@ -1,124 +1,139 @@
 import crypto from 'node:crypto';
 import { db, now } from './db.js';
-import { config } from './config.js';
 import { getModel } from './catalog.js';
 import { getProvider } from './providers/index.js';
 
 /*
- * In-process job worker (DECISION 007).
+ * Job progression.
  *
- * One loop drains QUEUED rows up to `jobConcurrency` at a time. Long-running
- * providers (video on Gemini) are started once and then polled; single-call
- * providers do all their work in run().
+ * This used to be a `setInterval` worker draining a queue. A serverless
+ * runtime does not run code between requests, so that loop would simply never
+ * fire — jobs would sit at QUEUED forever.
  *
- * State lives in SQLite, so a restart resumes rather than losing jobs.
+ * Instead a job advances one step inside the request that asks about it. The
+ * client already polls every 1.5s while a generation is running, so the poll
+ * *is* the tick. No cron, no queue service, and progress is driven by exactly
+ * the person waiting for it.
+ *
+ * See shared/decisions.md 013.
  */
 
-const running = new Set();
-let timer = null;
+/* Guards against two overlapping polls advancing the same job twice. */
+const inFlight = new Set();
 
-function rowToJob(row) {
-  let params = {};
-  try { params = JSON.parse(row.params); } catch { /* stored bad JSON; treat as empty */ }
-  return { ...row, params };
+function parseParams(row) {
+  try {
+    return JSON.parse(row.params);
+  } catch {
+    return {};
+  }
 }
 
-function fail(id, message) {
-  db.prepare(`UPDATE generations SET status='FAILED', error=?, completed_at=? WHERE id=?`)
-    .run(String(message).slice(0, 1000), now(), id);
-}
-
-function complete(id, { outputUrl, thumbnailUrl, simulated }) {
-  db.prepare(
-    `UPDATE generations
-       SET status='COMPLETED', output_url=?, thumbnail_url=?, simulated=?, completed_at=?, error=NULL
-     WHERE id=?`
-  ).run(outputUrl, thumbnailUrl ?? null, simulated ? 1 : 0, now(), id);
+async function fail(job, message) {
+  await db.run(
+    `UPDATE generations SET status='FAILED', error=?, completed_at=? WHERE id=?`,
+    String(message).slice(0, 1000),
+    now(),
+    job.id
+  );
+  // A failed generation produced nothing, so the credits go back.
+  if (job.credits_cost) {
+    await db.batch([
+      {
+        sql: 'UPDATE users SET credits = credits + ? WHERE id = ?',
+        args: [job.credits_cost, job.user_id],
+      },
+      {
+        sql: 'INSERT INTO credit_ledger (id, user_id, delta, reason, generation, created_at) VALUES (?,?,?,?,?,?)',
+        args: [crypto.randomUUID(), job.user_id, job.credits_cost, 'refund:generation_failed', job.id, now()],
+      },
+    ]);
+  }
 }
 
 /*
- * Credits are deducted up front so a user cannot queue more than they can
- * afford. A failed generation refunds them - the user got nothing.
+ * Advances one generation by a single step. Safe to call on a finished job —
+ * it returns immediately — so callers do not need to check first.
  */
-function refund(job) {
-  if (!job.credits_cost) return;
-  db.prepare('UPDATE users SET credits = credits + ? WHERE id = ?').run(job.credits_cost, job.user_id);
-  db.prepare('INSERT INTO credit_ledger (id, user_id, delta, reason, generation, created_at) VALUES (?,?,?,?,?,?)')
-    .run(crypto.randomUUID(), job.user_id, job.credits_cost, 'refund:generation_failed', job.id, now());
-}
-
-async function processJob(row) {
-  const job = rowToJob(row);
-  const model = getModel(job.model);
-
-  if (!model) {
-    fail(job.id, `Model "${job.model}" is no longer available.`);
-    refund(job);
-    return;
-  }
-
-  const provider = getProvider(job.provider);
+export async function advance(id) {
+  if (inFlight.has(id)) return;
+  inFlight.add(id);
 
   try {
-    db.prepare(`UPDATE generations SET status='PROCESSING', started_at=COALESCE(started_at, ?) WHERE id=?`)
-      .run(now(), job.id);
+    const row = await db.get('SELECT * FROM generations WHERE id = ?', id);
+    if (!row) return;
+    if (row.status === 'COMPLETED' || row.status === 'FAILED') return;
 
-    // Long-running providers need a start call before the first poll.
-    if (!job.provider_job && provider.isLongRunning?.(job)) {
-      const { providerJobId } = await provider.start(job, model);
-      db.prepare('UPDATE generations SET provider_job=? WHERE id=?').run(providerJobId, job.id);
-      job.provider_job = providerJobId;
-    }
+    const job = { ...row, params: parseParams(row) };
+    const model = getModel(job.model);
 
-    const result = await provider.run(job, model);
-
-    if (result.status === 'PROCESSING') {
-      // Not finished: drop back to QUEUED so the next tick polls it again.
-      db.prepare(`UPDATE generations SET status='QUEUED' WHERE id=?`).run(job.id);
+    if (!model) {
+      await fail(job, `Model "${job.model}" is no longer available.`);
       return;
     }
 
-    complete(job.id, {
-      outputUrl: result.outputUrl,
-      thumbnailUrl: result.thumbnailUrl,
-      simulated: result.simulated ?? provider.id === 'simulator',
-    });
-  } catch (err) {
-    if (err?.retryable) {
-      // Transient: leave it queued, try again next tick.
-      db.prepare(`UPDATE generations SET status='QUEUED', error=? WHERE id=?`)
-        .run(`Retrying: ${err.message}`.slice(0, 1000), job.id);
-      return;
+    const provider = getProvider(job.provider);
+
+    try {
+      if (row.status === 'QUEUED') {
+        await db.run(
+          `UPDATE generations SET status='PROCESSING', started_at=COALESCE(started_at, ?) WHERE id=?`,
+          now(),
+          job.id
+        );
+      }
+
+      // Long-running providers need a start call before the first poll.
+      if (!job.provider_job && provider.isLongRunning?.(job)) {
+        const { providerJobId } = await provider.start(job, model);
+        await db.run('UPDATE generations SET provider_job=? WHERE id=?', providerJobId, job.id);
+        job.provider_job = providerJobId;
+      }
+
+      const result = await provider.run(job, model);
+
+      // Still working: leave it PROCESSING for the next poll to pick up.
+      if (result.status === 'PROCESSING') return;
+
+      await db.run(
+        `UPDATE generations
+            SET status='COMPLETED', output_url=?, thumbnail_url=?, simulated=?, completed_at=?, error=NULL
+          WHERE id=?`,
+        result.outputUrl,
+        result.thumbnailUrl ?? null,
+        (result.simulated ?? provider.id === 'simulator') ? 1 : 0,
+        now(),
+        job.id
+      );
+    } catch (err) {
+      if (err?.retryable) {
+        // Transient. Record why, stay PROCESSING, let the next poll retry.
+        await db.run(
+          `UPDATE generations SET error=? WHERE id=?`,
+          `Retrying: ${err.message}`.slice(0, 1000),
+          job.id
+        );
+        return;
+      }
+      await fail(job, err?.message || 'Generation failed.');
     }
-    fail(job.id, err?.message || 'Generation failed.');
-    refund(job);
+  } finally {
+    inFlight.delete(id);
   }
 }
 
-function tick() {
-  const free = config.jobConcurrency - running.size;
-  if (free <= 0) return;
-
-  const rows = db
-    .prepare(`SELECT * FROM generations WHERE status='QUEUED' ORDER BY created_at ASC LIMIT ?`)
-    .all(free)
-    .filter(row => !running.has(row.id));
-
-  for (const row of rows) {
-    running.add(row.id);
-    processJob(row)
-      .catch(err => fail(row.id, err?.message || 'Worker error.'))
-      .finally(() => running.delete(row.id));
-  }
-}
-
-export function startWorker() {
-  if (timer) return;
-  timer = setInterval(tick, 1000);
-  timer.unref?.();
-}
-
-export function stopWorker() {
-  if (timer) clearInterval(timer);
-  timer = null;
+/*
+ * Advances every unfinished job for one user. Used by the list endpoint so a
+ * generation started in another tab still progresses while you are looking at
+ * the library.
+ */
+export async function advanceForUser(userId, limit = 4) {
+  const rows = await db.all(
+    `SELECT id FROM generations
+      WHERE user_id = ? AND status IN ('QUEUED','PROCESSING')
+      ORDER BY created_at ASC LIMIT ?`,
+    userId,
+    limit
+  );
+  await Promise.allSettled(rows.map(row => advance(row.id)));
 }

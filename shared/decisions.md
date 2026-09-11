@@ -177,3 +177,41 @@ looks healthy.
 Rejected: rewriting the backend for serverless (Postgres + a queue service +
 blob storage). That is a different product's architecture and would throw away
 decisions 004 and 007 to satisfy a hosting choice.
+
+## 013 — Everything on Vercel: libSQL, Blob, and the poll as the tick
+
+Decision:
+Decision 012 is reversed. Both halves deploy to Vercel as one project: the
+static site plus a single serverless function at `api/[...slug].js` that serves
+the same Express app. `render.yaml` and `server/Dockerfile` are kept — a
+container is still the simpler host — but they are no longer the deployed path.
+
+Three things had to change, one per blocker:
+
+**SQLite on disk → libSQL.** Same SQLite dialect, spoken over HTTP to Turso.
+This is why libSQL rather than Postgres: the SQL, the `?` placeholders and even
+`PRAGMA table_info` in the migrations carry over untouched, so the diff is
+"every call is now async" instead of a dialect rewrite. Locally it still opens
+a plain file, so the project runs with no account and no network.
+
+**Local files → Vercel Blob.** One `save()` behind which either backend runs,
+chosen by whether a Blob token is present.
+
+**The background worker → the poll.** The worker was a `setInterval` draining a
+queue; serverless runs no code between requests, so it would never fire and
+every job would sit at QUEUED forever. Cron is not the answer either — Hobby
+allows one run per day. Instead a job advances one step inside the request that
+asks about it. The client already polls every 1.5s while a generation runs, so
+the poll *is* the tick: no cron, no queue service, and progress is driven by
+exactly the person waiting for it.
+
+Why this is viable at all: Vercel's max duration is 300s even on Hobby. A Veo
+render takes ~50s and a Gemini image ~12s, so a single invocation has room.
+
+What it costs:
+- The ffmpeg fallback cannot run on Vercel, so the `sim-*` models only work
+  locally. In production a missing `GEMINI_API_KEY` means no generation at all,
+  where before it meant watermarked local output.
+- `@libsql/client/web` is used when the database is remote. The default build
+  carries a platform-specific native binary, which is wrong for the serverless
+  host when the bundle is built elsewhere.

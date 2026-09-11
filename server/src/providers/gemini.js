@@ -1,6 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { config } from '../config.js';
+import { save } from '../storage.js';
 
 /*
  * Google Generative Language API adapter.
@@ -73,12 +72,7 @@ async function call(url, { method = 'POST', body } = {}) {
   return payload;
 }
 
-function writeBinary(jobId, ext, buffer) {
-  fs.mkdirSync(config.storageDir, { recursive: true });
-  const filename = `${jobId}.${ext}`;
-  fs.writeFileSync(path.join(config.storageDir, filename), buffer);
-  return `/files/${filename}`;
-}
+const writeBinary = (jobId, ext, buffer) => save(`${jobId}.${ext}`, buffer);
 
 /*
  * Gemini TTS returns raw signed 16-bit PCM, which no browser will play as-is.
@@ -147,7 +141,7 @@ async function pollVideo(job) {
   }
   const buffer = Buffer.from(await download.arrayBuffer());
 
-  return { status: 'COMPLETED', outputUrl: writeBinary(job.id, 'mp4', buffer), thumbnailUrl: null };
+  return { status: 'COMPLETED', outputUrl: await writeBinary(job.id, 'mp4', buffer), thumbnailUrl: null };
 }
 
 async function runImage(job, model) {
@@ -176,7 +170,7 @@ async function runImage(job, model) {
   }
 
   const buffer = Buffer.from(imagePart.inlineData.data, 'base64');
-  const url = writeBinary(job.id, 'png', buffer);
+  const url = await writeBinary(job.id, 'png', buffer);
   return { status: 'COMPLETED', outputUrl: url, thumbnailUrl: url };
 }
 
@@ -199,7 +193,7 @@ async function runAudio(job, model) {
   if (!audioPart) throw new ProviderError('Gemini returned no audio for this script.');
 
   const pcm = Buffer.from(audioPart.inlineData.data, 'base64');
-  const url = writeBinary(job.id, 'wav', pcmToWav(pcm));
+  const url = await writeBinary(job.id, 'wav', pcmToWav(pcm));
   return { status: 'COMPLETED', outputUrl: url, thumbnailUrl: null };
 }
 

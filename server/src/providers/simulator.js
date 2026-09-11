@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { config } from '../config.js';
+import { save } from '../storage.js';
 
 /*
  * The local provider. Renders a real, playable artefact with ffmpeg so the
@@ -225,10 +227,12 @@ export const simulator = {
   },
 
   async run(job) {
-    fs.mkdirSync(config.storageDir, { recursive: true });
+    // Render to a scratch directory, not to the storage location: in
+    // production storage is a remote blob store, not a path on this machine.
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), '8x-'));
     const ext = job.kind === 'video' ? 'mp4' : job.kind === 'image' ? 'png' : 'm4a';
     const filename = `${job.id}.${ext}`;
-    const outFile = path.join(config.storageDir, filename);
+    const outFile = path.join(workDir, filename);
     const params = job.params || {};
 
     if (job.kind === 'video') await renderVideo({ prompt: job.prompt, params, outFile });
@@ -239,24 +243,27 @@ export const simulator = {
       throw new Error('The renderer produced no output.');
     }
 
-    // A poster frame, so video history has something to show before play.
+    // ffmpeg can only write to a real path, so the render lands in a temp
+    // directory and is then handed to whichever storage backend is active.
+    const outputUrl = await save(filename, fs.readFileSync(outFile));
+
     let thumbnailUrl = null;
     if (job.kind === 'video') {
       const thumbName = `${job.id}.jpg`;
-      const thumbFile = path.join(config.storageDir, thumbName);
+      const thumbFile = path.join(workDir, thumbName);
       try {
         await runFfmpeg([
           '-y', '-hide_banner', '-loglevel', 'error',
           '-i', outFile, '-frames:v', '1', '-ss', '1', thumbFile,
         ]);
-        thumbnailUrl = `/files/${thumbName}`;
+        thumbnailUrl = await save(thumbName, fs.readFileSync(thumbFile));
       } catch {
         // A missing poster is cosmetic; the generation still succeeded.
       }
     } else if (job.kind === 'image') {
-      thumbnailUrl = `/files/${filename}`;
+      thumbnailUrl = outputUrl;
     }
 
-    return { outputUrl: `/files/${filename}`, thumbnailUrl, simulated: true };
+    return { outputUrl, thumbnailUrl, simulated: true };
   },
 };
