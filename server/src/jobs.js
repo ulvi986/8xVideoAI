@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { db, now } from './db.js';
+import { config } from './config.js';
 import { getModel } from './catalog.js';
 import { getProvider } from './providers/index.js';
 
@@ -20,6 +21,18 @@ import { getProvider } from './providers/index.js';
 
 /* Guards against two overlapping polls advancing the same job twice. */
 const inFlight = new Set();
+
+export const timeoutFor = kind => config.generationTimeoutSeconds[kind] ?? 0;
+
+/*
+ * Measured from when the job started, falling back to when it was created —
+ * a job that never got picked up still has to age out.
+ */
+function elapsedSeconds(job) {
+  const from = new Date(job.started_at ?? job.created_at).getTime();
+  if (!Number.isFinite(from)) return 0;
+  return (Date.now() - from) / 1000;
+}
 
 function parseParams(row) {
   try {
@@ -69,6 +82,24 @@ export async function advance(id) {
 
     if (!model) {
       await fail(job, `Model "${job.model}" is no longer available.`);
+      return;
+    }
+
+    /*
+     * Give up on anything that has run past its ceiling.
+     *
+     * Checked before doing any further work, so a job that blew the limit
+     * while nobody was polling is abandoned the moment someone looks, rather
+     * than being pushed one step further first.
+     *
+     * The provider is not cancelled — Veo has no cancel — so the remote render
+     * may still finish and be discarded. The credits go back either way, which
+     * is the part the user cares about.
+     */
+    const limit = timeoutFor(job.kind);
+    const elapsed = elapsedSeconds(job);
+    if (limit && elapsed > limit) {
+      await fail(job, `Timed out after ${limit}s. The model was still working; nothing was charged.`);
       return;
     }
 

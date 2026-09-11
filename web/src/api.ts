@@ -103,6 +103,8 @@ export interface Catalog {
   voices: { id: string; name: string; description: string }[];
   aspectRatios: string[];
   costs: Record<Kind, number>;
+  /* Seconds a generation may run before it is abandoned and refunded. */
+  timeouts: Record<Kind, number>;
   plans: Plan[];
   providerStatus: { gemini: boolean; simulator: boolean; enhancer: boolean };
 }

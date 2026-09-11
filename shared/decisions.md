@@ -215,3 +215,37 @@ What it costs:
 - `@libsql/client/web` is used when the database is remote. The default build
   carries a platform-specific native binary, which is wrong for the serverless
   host when the bundle is built elsewhere.
+
+## 014 — Generation time limits, and why 50s is too tight for Veo
+
+Decision:
+A generation is abandoned and refunded once it passes a per-kind ceiling.
+Defaults: **video 50s**, image 120s, audio 120s. All three are env-tunable
+(`VIDEO_TIMEOUT_SECONDS`, `IMAGE_TIMEOUT_SECONDS`, `AUDIO_TIMEOUT_SECONDS`).
+
+Reason:
+Requested — an open-ended wait is a bad experience, and a bounded one can be
+shown in the UI while it runs rather than only explained after it fails.
+
+**The 50s figure does not fit Veo, and this is measured, not assumed.**
+Observed end-to-end times for `veo-3.1-fast`:
+
+| Run | Time |
+|---|---|
+| production real-provider suite | 50s, 52s, 56s |
+| local, against the 50s cap | 52s → timed out, 54s → timed out |
+
+Both runs at the 50s cap failed. Veo sits right on the boundary, so at 50s
+essentially every video generation is abandoned seconds before it would have
+succeeded. Raising `VIDEO_TIMEOUT_SECONDS` to 75–90 makes video work while
+still bounding the wait; the default is left at 50 because that is what was
+asked for, and it is one environment variable to change.
+
+Implementation notes:
+- The check runs *before* the next provider step, so a job that blew the limit
+  while nobody was polling is abandoned the moment someone looks.
+- The provider is not cancelled, because Veo has no cancel. The remote render
+  may finish and be discarded. The credits are returned either way.
+- Because progress is poll-driven (DECISION 013), the ceiling is enforced when
+  a request arrives. A job whose tab is closed sits until the owner returns,
+  then ages out on the next poll rather than at the exact second.

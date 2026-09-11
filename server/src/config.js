@@ -87,6 +87,19 @@ export const config = {
   // Vercel Blob. Absent locally, where media is written to disk instead.
   blobToken: process.env.BLOB_READ_WRITE_TOKEN || '',
 
+  /*
+   * How long a generation may run before it is abandoned and refunded.
+   *
+   * Per kind, because they are not comparable: a Veo render is around a
+   * minute, while an image or a speech clip is closer to half that. All
+   * three are env-tunable so the ceiling can be raised without a code change.
+   */
+  generationTimeoutSeconds: {
+    video: Number(process.env.VIDEO_TIMEOUT_SECONDS || 50),
+    image: Number(process.env.IMAGE_TIMEOUT_SECONDS || 120),
+    audio: Number(process.env.AUDIO_TIMEOUT_SECONDS || 120),
+  },
+
   jobConcurrency: Number(process.env.JOB_CONCURRENCY || 2),
   providerTimeoutMs: Number(process.env.PROVIDER_TIMEOUT_MS || 300000),
   allowSimulator: bool(process.env.ALLOW_SIMULATOR, true),

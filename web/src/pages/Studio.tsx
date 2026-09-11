@@ -90,7 +90,12 @@ export default function Studio({ kind }: { kind: Kind }) {
         )}
 
         {generations.map(g => (
-          <Result key={g.id} generation={g} onDelete={remove} />
+          <Result
+            key={g.id}
+            generation={g}
+            onDelete={remove}
+            timeoutSeconds={catalog?.timeouts?.[g.kind]}
+          />
         ))}
       </div>
     </div>

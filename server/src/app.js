@@ -11,7 +11,7 @@ import {
   issueSession, revokeSession, publicUser,
 } from './auth.js';
 import { listModels, getModel, PLANS, VOICES, ASPECT_RATIOS, CREDIT_COST } from './catalog.js';
-import { advance, advanceForUser } from './jobs.js';
+import { advance, advanceForUser, timeoutFor } from './jobs.js';
 import { enhancePrompt, hasAzure, AzureError } from './azure.js';
 
 /*
@@ -181,6 +181,12 @@ app.get('/api/catalog', route(async (req, res) => {
     voices: VOICES,
     aspectRatios: ASPECT_RATIOS,
     costs: CREDIT_COST,
+    // Seconds a generation may run before it is abandoned and refunded.
+    timeouts: {
+      video: timeoutFor('video'),
+      image: timeoutFor('image'),
+      audio: timeoutFor('audio'),
+    },
     plans: PLANS,
     providerStatus: {
       gemini: hasGemini(),

@@ -173,6 +173,19 @@ try {
   // ---- Processing ----------------------------------------------------
   await page.waitForSelector('text=/Queued|Generating/', { timeout: 15000 });
   check('Processing state is shown', true);
+
+  // The wait must read as bounded: a generation that can be abandoned needs
+  // to say so while it runs, not only when it fails.
+  const cap = await page.evaluate(async () => {
+    const res = await fetch('/api/catalog');
+    return (await res.json()).timeouts?.video;
+  });
+  check('API publishes the video time limit', Number.isFinite(cap) && cap > 0, `${cap}s`);
+  check(
+    'Running generation shows the limit',
+    (await page.locator(`text=/${cap}s max/`).count()) > 0
+  );
+
   await shot(page, '04-processing');
 
   // ---- Completed -----------------------------------------------------

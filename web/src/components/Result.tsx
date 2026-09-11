@@ -31,9 +31,12 @@ function Action({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonEle
 export default function Result({
   generation,
   onDelete,
+  timeoutSeconds,
 }: {
   generation: Generation;
   onDelete?: (id: string) => void;
+  /* Shown while running, so the wait is visibly bounded rather than open-ended. */
+  timeoutSeconds?: number;
 }) {
   const [published, setPublished] = useState(generation.published);
   const [busy, setBusy] = useState(false);
@@ -77,6 +80,7 @@ export default function Result({
             </span>
             <span className="tabular-nums">
               <Elapsed from={generation.startedAt ?? generation.createdAt} />
+              {timeoutSeconds ? <span className="text-muted/70"> / {timeoutSeconds}s max</span> : null}
             </span>
           </div>
         )}
