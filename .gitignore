@@ -20,3 +20,6 @@ build/
 
 # Generated media (large binaries; regenerate instead of committing)
 server/storage/
+
+# Local database — contains real user rows and password hashes
+server/data/
