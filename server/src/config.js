@@ -90,14 +90,21 @@ export const config = {
   /*
    * How long a generation may run before it is abandoned and refunded.
    *
-   * Per kind, because they are not comparable: a Veo render is around a
-   * minute, while an image or a speech clip is closer to half that. All
-   * three are env-tunable so the ceiling can be raised without a code change.
+   * Off by default: 0 means no ceiling. A 50s cap was tried and removed —
+   * veo-3.1-fast takes 50-56s, so it discarded renders seconds before they
+   * finished, costing the generation and delivering nothing.
+   *
+   * The mechanism is kept because it is the only thing that reclaims credits
+   * from a job that never resolves. Set any of these to a number of seconds
+   * to turn it back on for that kind.
+   *
+   * Two backstops exist regardless: the provider call has its own timeout
+   * (PROVIDER_TIMEOUT_MS), and a serverless invocation is capped at 300s.
    */
   generationTimeoutSeconds: {
-    video: Number(process.env.VIDEO_TIMEOUT_SECONDS || 50),
-    image: Number(process.env.IMAGE_TIMEOUT_SECONDS || 120),
-    audio: Number(process.env.AUDIO_TIMEOUT_SECONDS || 120),
+    video: Number(process.env.VIDEO_TIMEOUT_SECONDS || 0),
+    image: Number(process.env.IMAGE_TIMEOUT_SECONDS || 0),
+    audio: Number(process.env.AUDIO_TIMEOUT_SECONDS || 0),
   },
 
   jobConcurrency: Number(process.env.JOB_CONCURRENCY || 2),

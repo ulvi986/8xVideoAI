@@ -174,16 +174,21 @@ try {
   await page.waitForSelector('text=/Queued|Generating/', { timeout: 15000 });
   check('Processing state is shown', true);
 
-  // The wait must read as bounded: a generation that can be abandoned needs
-  // to say so while it runs, not only when it fails.
+  /*
+   * The time limit is off by default (0 = no ceiling). Whichever way it is
+   * configured, the UI has to agree with the server: show the cap while
+   * running if there is one, and promise nothing if there is not.
+   */
   const cap = await page.evaluate(async () => {
     const res = await fetch('/api/catalog');
     return (await res.json()).timeouts?.video;
   });
-  check('API publishes the video time limit', Number.isFinite(cap) && cap > 0, `${cap}s`);
+  check('API publishes the video time limit', Number.isFinite(cap), `${cap} (0 = no limit)`);
+
+  const showsCap = (await page.locator('text=/s max/').count()) > 0;
   check(
-    'Running generation shows the limit',
-    (await page.locator(`text=/${cap}s max/`).count()) > 0
+    cap > 0 ? 'Running generation shows the limit' : 'No limit is advertised when none is set',
+    cap > 0 ? showsCap : !showsCap
   );
 
   await shot(page, '04-processing');

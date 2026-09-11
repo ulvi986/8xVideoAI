@@ -216,12 +216,15 @@ What it costs:
   carries a platform-specific native binary, which is wrong for the serverless
   host when the bundle is built elsewhere.
 
-## 014 — Generation time limits, and why 50s is too tight for Veo
+## 014 — Generation time limits (added, then turned off)
 
 Decision:
 A generation is abandoned and refunded once it passes a per-kind ceiling.
-Defaults: **video 50s**, image 120s, audio 120s. All three are env-tunable
-(`VIDEO_TIMEOUT_SECONDS`, `IMAGE_TIMEOUT_SECONDS`, `AUDIO_TIMEOUT_SECONDS`).
+**Superseded: the limits are now off by default (0 = no ceiling).** The
+mechanism remains and is env-tunable (`VIDEO_TIMEOUT_SECONDS`,
+`IMAGE_TIMEOUT_SECONDS`, `AUDIO_TIMEOUT_SECONDS`) because it is the only thing
+that reclaims credits from a job that never resolves — but nothing is capped
+unless someone sets a value.
 
 Reason:
 Requested — an open-ended wait is a bad experience, and a bounded one can be
