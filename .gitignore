@@ -23,3 +23,7 @@ server/storage/
 
 # Local database — contains real user rows and password hashes
 server/data/
+
+# Tooling caches created during the build (hundreds of MB)
+.npm-cache/
+.playwright/

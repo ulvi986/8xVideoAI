@@ -16,10 +16,14 @@
 - [x] Job worker — QUEUED → PROCESSING → COMPLETED/FAILED, restart-safe
 - [x] Generation API — create, list, get, delete
 - [x] Backend QA — 9 error paths + refund-on-failure verified
+- [x] Frontend — Vite/React shell, studio pages, pricing, profile, auth
+- [x] Browser QA — 20 checks over the critical flow, 3 consecutive clean runs
+- [x] Fixed BUG-001 stuck-on-Queued race, BUG-002 47MB video, BUG-005 upload overflow
+- [x] README + BUGS.md
 
 ## In Progress
 
-- [ ] Frontend — Vite/React shell, studio pages, pricing, profile
+Nothing — the build is at a stable point.
 
 ## Blocked
 
@@ -31,5 +35,5 @@
 
 ## Next
 
-- [ ] End-to-end QA of the critical flow in the browser
-- [ ] `BUGS.md` from that pass
+- [ ] Exercise the Gemini adapter against the live API once a key exists
+- [ ] Deploy — needs SESSION_SECRET and object storage for generated media

@@ -1,0 +1,13 @@
+{
+  "sessionId": "480a652f-abe7-4f30-976d-fb4b307760c2",
+  "short": "480a652f",
+  "date": "2026-09-11",
+  "firstPromptTime": "2026-09-11T13:04:52.424Z",
+  "lastPromptTime": "2026-09-11T13:47:22.668Z",
+  "count": 2,
+  "model": "claude-opus-5",
+  "awaitingResponse": true,
+  "file": "E:\\8xvideoAI\\.agent-logs\\2026-09-11_13-04-52_480a652f-abe7-4f30-976d-fb4b307760c2.md",
+  "promptTimestamp": "2026-09-11T13:47:22.668Z",
+  "promptModelUnknown": false
+}

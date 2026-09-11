@@ -61,22 +61,47 @@ function wrap(text, width) {
   return lines;
 }
 
-function runFfmpeg(args) {
+/*
+ * `-nostdin` matters: without it ffmpeg opens stdin for interactive keys, and
+ * a spawned pipe that is never written to can leave it waiting.
+ *
+ * The kill timer matters more. This promise is awaited by the job worker
+ * while holding one of its concurrency slots; if ffmpeg ever hung, the
+ * promise would never settle, the slot would never be released, and after
+ * JOB_CONCURRENCY hangs the queue would stop forever.
+ */
+function runFfmpeg(args, { timeoutMs = 120000 } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(FFMPEG, args, { windowsHide: true });
+    const child = spawn(FFMPEG, ['-nostdin', ...args], { windowsHide: true });
     let stderr = '';
+    let settled = false;
+
+    const finish = fn => (...a) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(...a);
+    };
+
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(reject)(new Error(`The renderer timed out after ${Math.round(timeoutMs / 1000)}s.`));
+    }, timeoutMs);
+
     child.stderr.on('data', chunk => { stderr += chunk.toString(); });
-    child.on('error', err => {
+
+    child.on('error', finish(err => {
       reject(new Error(
         err.code === 'ENOENT'
           ? 'ffmpeg was not found on PATH. Set FFMPEG_PATH or install ffmpeg.'
           : `ffmpeg failed to start: ${err.message}`
       ));
-    });
-    child.on('close', code => {
+    }));
+
+    child.on('close', finish(code => {
       if (code === 0) return resolve();
       reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-600)}`));
-    });
+    }));
   });
 }
 
