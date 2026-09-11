@@ -89,6 +89,22 @@ body {
   outline-offset: 2px;
 }
 
+/*
+ * The composer's field is an exception.
+ *
+ * An outline follows the element's own border-radius, and the textarea has
+ * none — it is a plain box inside a rounded container. So the focus ring drew
+ * a hard-cornered rectangle straight across the composer. The container shows
+ * the focus state instead (border + ring, both of which follow its radius),
+ * so the field must not draw its own.
+ *
+ * This suppresses the ring on one element, not globally: every button, link
+ * and other input still gets it.
+ */
+.composer-field:focus-visible {
+  outline: none;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;

@@ -113,12 +113,21 @@ export default function Composer({
     if (usable && (!selected || selected.kind !== kind)) setModel(usable.id);
   }, [kind, models, selected]);
 
-  // Grow the textarea with its content instead of scrolling inside it.
+  /*
+   * Grow with the content instead of scrolling inside it.
+   *
+   * overflow is toggled rather than left on `auto`: a permanently scrollable
+   * field flickers a scrollbar on and off as each line wraps. It only becomes
+   * scrollable once the content genuinely exceeds the cap.
+   */
   useEffect(() => {
     const el = textarea.current;
     if (!el) return;
+    const MAX = 260;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 260)}px`;
+    const next = Math.min(el.scrollHeight, MAX);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > MAX ? 'auto' : 'hidden';
   }, [prompt]);
 
   async function enhance() {
@@ -165,7 +174,7 @@ export default function Composer({
 
   return (
     <form onSubmit={submit}>
-      <div className="rounded-[var(--radius-composer)] border border-border bg-surface transition focus-within:border-accent/50">
+      <div className="rounded-[var(--radius-composer)] border border-border bg-surface transition focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
         <textarea
           ref={textarea}
           value={prompt}
@@ -182,7 +191,7 @@ export default function Composer({
           rows={1}
           placeholder={PLACEHOLDER[kind]}
           aria-label="Prompt"
-          className="block w-full resize-none bg-transparent px-4 pt-4 pb-2 text-[15px] leading-relaxed outline-none"
+          className="composer-field block w-full resize-none overflow-y-hidden bg-transparent px-4 pt-4 pb-2 text-[15px] leading-relaxed outline-none"
         />
 
         {image && (

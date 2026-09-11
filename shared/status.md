@@ -22,7 +22,7 @@ ChatGPT/Perplexity reference.
 
 | Suite | Scope | Result |
 |---|---|---|
-| `web/qa/flow.mjs` | critical flow, redesign criteria, both themes | **36/36** |
+| `web/qa/flow.mjs` | critical flow, redesign criteria, composer behaviour, both themes | **40/40** |
 | `web/qa/real-providers.mjs` | Veo + Gemini image + Gemini TTS + Azure | **7/7** |
 | `server/npm run check:gemini` | key auth + model availability | all 4 models ok |
 | `server/npm run check:azure` | rewriter round trip | ok, ~6s |

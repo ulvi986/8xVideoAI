@@ -232,3 +232,41 @@ redirects to sign-in *inside* the submit handler, which could never fire.
 **Fix:** the composer takes a `signedIn` prop. When false it skips the credit
 gate and hides the cost readout and the warning; submitting hands off to the
 parent, which redirects. Three QA checks cover it.
+
+---
+
+## BUG-009 — A square focus rectangle cut across the composer
+
+**Severity:** Medium — visible the moment anyone starts typing, which is the
+first thing anyone does.
+
+**Steps to reproduce:** click into the composer on any page and type.
+
+**Expected:** the rounded composer indicates focus.
+
+**Actual:** a hard-cornered turquoise rectangle was drawn around the text area,
+overlapping the rounded container. A scrollbar also flickered in and out of the
+field as lines wrapped.
+
+**Cause:** two separate things.
+
+1. The global `:focus-visible { outline: 2px solid … }` rule and Tailwind's
+   `outline-none` utility have the same specificity, and the custom rule comes
+   later in the stylesheet, so it won. An outline follows the *focused
+   element's* border-radius — and the textarea is a plain box inside the
+   rounded container, with no radius of its own. Hence square corners.
+2. The field was `overflow-y: auto` permanently, so the browser showed and hid
+   a scrollbar on every wrap, even though the field auto-grows and normally
+   never needs one.
+
+**Fix:**
+1. `.composer-field:focus-visible { outline: none }`, and the container now
+   carries the focus state with a border and a ring — both of which follow its
+   radius. The ring is suppressed on exactly one element; every button, link
+   and other input keeps it.
+2. The auto-grow effect toggles overflow: `hidden` while the content fits,
+   `auto` only once it exceeds the 260px cap.
+
+Four QA checks cover it: no outline on the field, a visible focus state on the
+container, no scrolling on ordinary text, and capped height with scrolling
+beyond it.

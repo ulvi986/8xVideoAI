@@ -78,6 +78,59 @@ try {
   check('Composer clamps to a narrow column', column && column.width <= 820, JSON.stringify(column));
 
   /*
+   * Focus and growth behaviour. The global :focus-visible ring drew a
+   * hard-cornered rectangle across the rounded composer, because an outline
+   * follows the focused element's own radius and the textarea has none.
+   * The container must show focus instead, and the field must not scroll
+   * until the content genuinely exceeds the cap.
+   */
+  await page.click(PROMPT);
+  const focused = await page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    const box = el.closest('div');
+    return {
+      fieldOutline: getComputedStyle(el).outlineStyle,
+      containerRing: getComputedStyle(box).boxShadow !== 'none',
+    };
+  }, PROMPT);
+  check('Composer field draws no square focus outline', focused.fieldOutline === 'none', focused.fieldOutline);
+  check('Composer container shows the focus state instead', focused.containerRing);
+
+  await page.fill(PROMPT, 'a paper boat drifting down a rain gutter at dusk, slow dolly in, 85mm lens, shallow depth of field, amber streetlight and cool teal shadows');
+  await page.waitForTimeout(250);
+  const grown = await page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    return {
+      overflow: getComputedStyle(el).overflowY,
+      scrolls: el.scrollHeight > el.clientHeight,
+      height: Math.round(el.getBoundingClientRect().height),
+    };
+  }, PROMPT);
+  check(
+    'Composer grows instead of scrolling on ordinary text',
+    !grown.scrolls && grown.overflow === 'hidden',
+    JSON.stringify(grown)
+  );
+
+  // But it must still become scrollable rather than growing without limit.
+  await page.fill(PROMPT, Array.from({ length: 40 }, (_, i) => `line ${i + 1} of a very long prompt`).join(' '));
+  await page.waitForTimeout(250);
+  const capped = await page.evaluate(sel => {
+    const el = document.querySelector(sel);
+    return {
+      overflow: getComputedStyle(el).overflowY,
+      scrolls: el.scrollHeight > el.clientHeight,
+      height: Math.round(el.getBoundingClientRect().height),
+    };
+  }, PROMPT);
+  check(
+    'Composer caps its height and scrolls past that',
+    capped.scrolls && capped.overflow === 'auto' && capped.height <= 260,
+    JSON.stringify(capped)
+  );
+  await page.fill(PROMPT, '');
+
+  /*
    * A signed-out visitor must be able to type and send — that is the path to
    * sign-up. Gating them on a credit balance they do not have disabled the
    * button and showed them a warning they could do nothing about.

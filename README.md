@@ -81,7 +81,7 @@ shared/     PROJECT, DESIGN, STATUS, TASKS, DECISIONS, BUGS
 ```bash
 cd web
 npx playwright install chromium   # once
-node qa/flow.mjs                  # 36 checks, free, ~2 min
+node qa/flow.mjs                  # 40 checks, free, ~2 min
 node qa/real-providers.mjs        # 7 checks against the real models — billed
 ```
 
