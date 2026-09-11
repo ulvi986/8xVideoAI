@@ -1,0 +1,13 @@
+{
+  "sessionId": "11dd6d0e-04ef-4e5b-bc04-47939a2e35b1",
+  "short": "11dd6d0e",
+  "date": "2026-09-11",
+  "firstPromptTime": "2026-09-11T12:39:19.505Z",
+  "lastPromptTime": "2026-09-11T12:39:19.505Z",
+  "count": 1,
+  "model": "claude-haiku-4-5-20251001",
+  "awaitingResponse": false,
+  "file": "E:\\8xvideoAI\\.agent-logs\\2026-09-11_12-39-19_11dd6d0e-04ef-4e5b-bc04-47939a2e35b1.md",
+  "promptTimestamp": "2026-09-11T12:39:19.505Z",
+  "promptModelUnknown": false
+}

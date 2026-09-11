@@ -1,0 +1,22 @@
+# Secrets — never commit. Quoted patterns do NOT work in .gitignore:
+# git reads the quote marks as literal characters, so ".env" matched
+# nothing and left the real .env exposed.
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.vite/
+
+# Runtime artefacts
+*.log
+.DS_Store
+
+# Generated media (large binaries; regenerate instead of committing)
+server/storage/

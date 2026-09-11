@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/capture-agent-log.js", "prompt"],
+            "timeout": 30,
+            "statusMessage": "Capturing prompt to .agent-logs"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/capture-agent-log.js", "response"],
+            "timeout": 30,
+            "statusMessage": "Capturing response to .agent-logs"
+          }
+        ]
+      }
+    ]
+  }
+}
