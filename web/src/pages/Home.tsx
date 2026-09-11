@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, type CommunityPost, type Kind } from '../api';
+import { api, asset, type CommunityPost, type Kind } from '../api';
 import { useAuth } from '../auth';
 import Composer from '../components/Composer';
 import { useCatalog } from '../useStudio';
@@ -108,8 +108,8 @@ export default function Home() {
               >
                 {post.kind === 'video' ? (
                   <video
-                    src={post.outputUrl}
-                    poster={post.thumbnailUrl ?? undefined}
+                    src={asset(post.outputUrl)}
+                    poster={post.thumbnailUrl ? asset(post.thumbnailUrl) : undefined}
                     muted
                     loop
                     playsInline
@@ -118,7 +118,7 @@ export default function Home() {
                   />
                 ) : (
                   <img
-                    src={post.outputUrl}
+                    src={asset(post.outputUrl)}
                     alt={post.prompt}
                     loading="lazy"
                     className="h-full w-full object-cover"

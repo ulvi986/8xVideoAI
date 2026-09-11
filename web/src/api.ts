@@ -1,5 +1,22 @@
 /* Everything the browser knows about the server lives here. */
 
+/*
+ * Where the API lives.
+ *
+ * Empty in development: Vite proxies /api and /files to localhost:8787, so the
+ * browser stays same-origin. In production the frontend (Vercel) and the API
+ * (a host that can run a persistent process) are different origins, so this is
+ * set at build time to the API's base URL.
+ */
+export const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '');
+
+/*
+ * Media paths come back from the API relative ("/files/abc.mp4"). Same-origin
+ * in dev, but on Vercel they must be resolved against the API, not against the
+ * static site — otherwise every video and image 404s in production.
+ */
+export const asset = (url: string) => (/^https?:\/\//.test(url) ? url : API_BASE + url);
+
 export type Kind = 'video' | 'image' | 'audio';
 export type Status = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
@@ -129,7 +146,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
 
   try {
-    response = await fetch(path, {
+    response = await fetch(API_BASE + path, {
       ...init,
       headers: {
         'content-type': 'application/json',

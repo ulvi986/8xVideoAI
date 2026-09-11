@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, ApiError, type Generation } from '../api';
+import { api, ApiError, asset, type Generation } from '../api';
 
 /*
  * One generation, as a row in the feed below the composer.
@@ -94,8 +94,8 @@ export default function Result({
           <>
             {generation.kind === 'video' && (
               <video
-                src={generation.outputUrl}
-                poster={generation.thumbnailUrl ?? undefined}
+                src={asset(generation.outputUrl)}
+                poster={generation.thumbnailUrl ? asset(generation.thumbnailUrl) : undefined}
                 controls
                 loop
                 playsInline
@@ -104,18 +104,18 @@ export default function Result({
             )}
             {generation.kind === 'image' && (
               <img
-                src={generation.outputUrl}
+                src={asset(generation.outputUrl)}
                 alt={generation.prompt}
                 className="w-full rounded-[var(--radius-card)] border border-border"
               />
             )}
             {generation.kind === 'audio' && (
-              <audio src={generation.outputUrl} controls className="w-full" />
+              <audio src={asset(generation.outputUrl)} controls className="w-full" />
             )}
 
             <div className="mt-2 flex flex-wrap items-center gap-1">
               <a
-                href={generation.outputUrl}
+                href={asset(generation.outputUrl)}
                 download
                 className="rounded-lg px-2 py-1 text-[12px] text-muted transition hover:bg-surface2 hover:text-text"
               >

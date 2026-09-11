@@ -44,9 +44,15 @@ function bool(value, fallback) {
 
 export const config = {
   port: Number(process.env.PORT || 8787),
-  dataDir: path.join(SERVER_ROOT, 'data'),
-  storageDir: path.join(SERVER_ROOT, 'storage'),
-  uploadsDir: path.join(SERVER_ROOT, 'storage', 'uploads'),
+  /*
+   * Both default to the repo, which is what you want locally. In production
+   * they are pointed at a mounted disk: a container's own filesystem is
+   * discarded on every deploy, which would take the database and every
+   * generated file with it.
+   */
+  dataDir: process.env.DATA_DIR || path.join(SERVER_ROOT, 'data'),
+  storageDir: process.env.STORAGE_DIR || path.join(SERVER_ROOT, 'storage'),
+  uploadsDir: path.join(process.env.STORAGE_DIR || path.join(SERVER_ROOT, 'storage'), 'uploads'),
 
   /*
    * Sessions are signed with this. A generated fallback keeps dev working
@@ -74,9 +80,17 @@ export const config = {
   jobConcurrency: Number(process.env.JOB_CONCURRENCY || 2),
   providerTimeoutMs: Number(process.env.PROVIDER_TIMEOUT_MS || 300000),
   allowSimulator: bool(process.env.ALLOW_SIMULATOR, true),
+  allowVercelPreviews: bool(process.env.ALLOW_VERCEL_PREVIEWS, true),
 
   startingCredits: Number(process.env.STARTING_CREDITS || 10),
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  /*
+   * Comma-separated, because production has at least two legitimate origins:
+   * the Vercel production domain and its preview deployments.
+   */
+  corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean),
 };
 
 export const hasGemini = () => Boolean(config.geminiApiKey);

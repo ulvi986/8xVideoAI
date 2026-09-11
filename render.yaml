@@ -1,0 +1,50 @@
+# Backend deployment. The frontend goes to Vercel; this is the half that
+# Vercel cannot host — it needs a persistent process, a writable disk and
+# ffmpeg. See shared/decisions.md 012.
+services:
+  - type: web
+    name: 8xbuildai-api
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    plan: starter # a disk requires a paid instance; free has no persistence
+    region: frankfurt
+    healthCheckPath: /api/health
+
+    # The database and every generated file live here. Without a disk both are
+    # discarded on each deploy, because a container's own filesystem is
+    # ephemeral.
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 10
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data/db
+      - key: STORAGE_DIR
+        value: /var/data/storage
+
+      # Sessions are signed with this. Generated once and kept, so a redeploy
+      # does not sign everyone out.
+      - key: SESSION_SECRET
+        generateValue: true
+
+      # Set in the dashboard, never in this file — it is committed publicly.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_AI_API_KEY
+        sync: false
+      - key: AZURE_AI_MODEL
+        sync: false
+      - key: AZURE_OPENAI_API_VERSION
+        sync: false
+
+      # The Vercel production domain. Preview deployments are matched by
+      # pattern in the server's CORS check.
+      - key: CORS_ORIGIN
+        sync: false

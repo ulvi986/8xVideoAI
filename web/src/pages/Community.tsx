@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type CommunityPost } from '../api';
+import { api, asset, type CommunityPost } from '../api';
 import { useAuth } from '../auth';
 
 type Filter = 'all' | 'video' | 'image';
@@ -42,8 +42,8 @@ function Card({ post, onLike }: { post: CommunityPost; onLike: (id: string) => v
             {post.kind === 'video' ? (
               <video
                 ref={video}
-                src={post.outputUrl}
-                poster={post.thumbnailUrl ?? undefined}
+                src={asset(post.outputUrl)}
+                poster={post.thumbnailUrl ? asset(post.thumbnailUrl) : undefined}
                 muted
                 loop
                 playsInline
@@ -52,7 +52,7 @@ function Card({ post, onLike }: { post: CommunityPost; onLike: (id: string) => v
               />
             ) : (
               <img
-                src={post.outputUrl}
+                src={asset(post.outputUrl)}
                 alt={post.prompt}
                 loading="lazy"
                 className="h-full w-full object-cover"
@@ -87,9 +87,9 @@ function Card({ post, onLike }: { post: CommunityPost; onLike: (id: string) => v
         >
           <div className="max-h-full w-full max-w-3xl overflow-auto" onClick={e => e.stopPropagation()}>
             {post.kind === 'video' ? (
-              <video src={post.outputUrl} controls autoPlay loop className="w-full rounded-[var(--radius-card)]" />
+              <video src={asset(post.outputUrl)} controls autoPlay loop className="w-full rounded-[var(--radius-card)]" />
             ) : (
-              <img src={post.outputUrl} alt={post.prompt} className="w-full rounded-[var(--radius-card)]" />
+              <img src={asset(post.outputUrl)} alt={post.prompt} className="w-full rounded-[var(--radius-card)]" />
             )}
             <p className="mt-3 text-[14px]">{post.prompt}</p>
             <p className="mt-1 text-[12px] text-muted">

@@ -149,3 +149,31 @@ One accent on one action. A QA check counts filled accent backgrounds on a page
 and fails above one, because the previous design used the accent on nav links,
 borders, badges, chips and buttons at once, which left nothing reading as
 primary.
+
+## 012 — The frontend deploys to Vercel; the API cannot
+
+Decision:
+`web/` deploys to Vercel as a static SPA. `server/` deploys as a container to a
+host that runs a persistent process with a mounted disk (Render — the account
+already connected). `render.yaml` and `server/Dockerfile` describe it.
+
+Reason:
+Vercel's runtime is serverless, and the API depends on four things it does not
+provide:
+
+| Needs | Where | Serverless reality |
+|---|---|---|
+| A writable disk for SQLite | `db.js` — `node:sqlite` opens `data/app.db` | filesystem is ephemeral and per-invocation |
+| A writable disk for media | `index.js` serves `/files` from `storage/` | same — every generated file vanishes |
+| A long-running background loop | `jobs.js` — `setInterval` drains the queue | functions do not run between requests, so jobs would never progress |
+| The `ffmpeg` binary | `simulator.js` spawns it | not present in the runtime |
+
+Splitting them costs one thing — the browser now talks cross-origin — which is
+handled by `VITE_API_BASE` at build time and an origin allowlist on the server.
+Media URLs come back relative, so the client resolves them through `asset()`;
+without that every image and video 404s in production while the API itself
+looks healthy.
+
+Rejected: rewriting the backend for serverless (Postgres + a queue service +
+blob storage). That is a different product's architecture and would throw away
+decisions 004 and 007 to satisfy a hosting choice.

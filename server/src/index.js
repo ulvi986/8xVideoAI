@@ -18,7 +18,28 @@ fs.mkdirSync(config.storageDir, { recursive: true });
 fs.mkdirSync(config.uploadsDir, { recursive: true });
 
 const app = express();
-app.use(cors({ origin: config.corsOrigin, credentials: true }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      // No Origin header: same-origin, curl, or a health check. Allow it.
+      if (!origin) return callback(null, true);
+      if (config.corsOrigins.includes(origin)) return callback(null, true);
+      // Vercel preview deployments get a generated subdomain per branch.
+      if (config.allowVercelPreviews && /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+      /*
+       * Refuse by omitting the CORS headers, not by throwing. Throwing here
+       * reaches the error handler and answers 500, which reads as "the server
+       * is broken" when the request was simply from an origin we do not serve.
+       * The browser enforces the block either way; this is not the auth
+       * boundary — the bearer token is.
+       */
+      return callback(null, false);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '25mb' }));
 app.use(attachUser);
 
